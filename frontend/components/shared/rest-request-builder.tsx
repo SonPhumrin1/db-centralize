@@ -31,12 +31,10 @@ export function RestRequestBuilder({
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-[140px_minmax(0,1fr)]">
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="rest-method">
-            Method
-          </label>
+        <label className="field-stack" htmlFor="rest-method">
+          <span className="field-label">Method</span>
           <select
-            className="flex h-10 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="field-select"
             id="rest-method"
             onChange={(event) =>
               onChange({
@@ -52,12 +50,10 @@ export function RestRequestBuilder({
               </option>
             ))}
           </select>
-        </div>
+        </label>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="rest-path">
-            Relative path
-          </label>
+        <label className="field-stack" htmlFor="rest-path">
+          <span className="field-label">Relative path</span>
           <Input
             id="rest-path"
             onChange={(event) =>
@@ -69,18 +65,19 @@ export function RestRequestBuilder({
             placeholder="/orders"
             value={request.path}
           />
-        </div>
+        </label>
       </div>
 
-      <div className="rounded-[1.4rem] border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">Request preview</p>
-        <p className="mt-2 break-all font-mono text-xs leading-6">
+      <div className="rounded-[8px] border border-border bg-surface-raised px-4 py-3">
+        <p className="page-label">Request preview</p>
+        <p className="mt-2 break-all font-mono text-xs leading-6 text-foreground">
           {formatRestRequestPreview(request)}
         </p>
         {source?.summary.baseUrl ? (
-          <p className="mt-3 text-xs leading-5">
-            Base URL: <span className="font-medium text-foreground">{source.summary.baseUrl}</span>
-            {" · "}Auth: <span className="font-medium text-foreground">{authType}</span>
+          <p className="mt-3 text-xs leading-6 text-secondary">
+            Base URL: <span className="font-mono text-foreground">{source.summary.baseUrl}</span>
+            <span className="px-2 text-tertiary">/</span>
+            Auth: <span className="font-mono text-foreground">{authType}</span>
           </p>
         ) : null}
       </div>
@@ -121,12 +118,10 @@ export function RestRequestBuilder({
         }
       />
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor="rest-body">
-          JSON body
-        </label>
+      <label className="field-stack" htmlFor="rest-body">
+        <span className="field-label">JSON body</span>
         <textarea
-          className="min-h-32 w-full rounded-[1.2rem] border border-input bg-background px-3 py-3 text-sm leading-6 shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="field-textarea min-h-32 font-mono leading-6"
           id="rest-body"
           onChange={(event) =>
             onChange({
@@ -134,17 +129,21 @@ export function RestRequestBuilder({
               body: event.target.value,
             })
           }
-          placeholder={request.method === "GET" ? "{\n  \"note\": \"Optional for GET\"\n}" : "{\n  \"severity\": \"high\"\n}"}
+          placeholder={
+            request.method === "GET"
+              ? '{\n  "note": "Optional for GET"\n}'
+              : '{\n  "severity": "high"\n}'
+          }
           spellCheck={false}
           value={request.body}
         />
-        <p className="text-xs leading-5 text-muted-foreground">
+        <p className="text-xs leading-6 text-secondary">
           Leave empty for read-only requests. When present, the body must be valid JSON.
         </p>
-      </div>
+      </label>
 
       {previewPath && request.method !== "GET" ? (
-        <p className="text-xs leading-5 text-muted-foreground">
+        <p className="text-xs leading-6 text-secondary">
           Final request path: <span className="font-mono text-foreground">{previewPath}</span>
         </p>
       ) : null}
@@ -166,11 +165,11 @@ function PairListEditor({
   onChange: (items: RestFieldPair[]) => void
 }) {
   return (
-    <div className="space-y-3 rounded-[1.4rem] border border-border/70 bg-background/70 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-[8px] border border-border bg-surface px-4 py-4">
+      <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
         <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-xs leading-5 text-muted-foreground">{description}</p>
+          <p className="field-label">{label}</p>
+          <p className="mt-1 text-sm leading-6 text-secondary">{description}</p>
         </div>
         <Button onClick={onAdd} size="sm" type="button" variant="outline">
           <Plus className="size-4" />
@@ -179,15 +178,13 @@ function PairListEditor({
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-[1rem] border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-xs leading-5 text-muted-foreground">
-          No entries yet.
-        </div>
+        <div className="pt-4 text-sm text-secondary">No entries yet.</div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 pt-4">
           {items.map((item) => (
             <div
               key={item.id}
-              className="grid gap-3 rounded-[1rem] border border-border/70 bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+              className="grid gap-3 border border-border bg-surface-raised px-3 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
             >
               <Input
                 onChange={(event) =>
@@ -222,7 +219,7 @@ function PairListEditor({
                 }
                 size="icon-sm"
                 type="button"
-                variant="outline"
+                variant="ghost"
               >
                 <Trash2 className="size-4" />
               </Button>

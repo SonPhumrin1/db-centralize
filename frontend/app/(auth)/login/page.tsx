@@ -1,24 +1,25 @@
 import { redirect } from "next/navigation"
 
 import { LoginForm } from "@/components/auth/login-form"
+import { TypeTag } from "@/components/dashboard/platform-ui"
 import { getServerSession } from "@/lib/server-session"
 
-const capabilityCards = [
+const capabilityRows = [
   {
-    index: "01",
+    code: "01",
     title: "Centralized source access",
     description:
       "Bring PostgreSQL, MySQL, and REST systems into one operational surface.",
   },
   {
-    index: "02",
+    code: "02",
     title: "Owner-scoped endpoints",
     description:
       "Published routes stay bound to the user who authored the underlying query.",
   },
   {
-    index: "03",
-    title: "Session-backed dashboard",
+    code: "03",
+    title: "Session-backed control",
     description:
       "Frontend access and Go API permissions read from the same session state.",
   },
@@ -40,67 +41,64 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <main className="min-h-svh px-6 py-8 text-foreground md:px-8 md:py-10">
-      <div className="mx-auto grid min-h-[calc(100svh-4rem)] max-w-[1500px] gap-6 lg:grid-cols-[1.18fr_0.82fr]">
-        <section className="page-shell flex flex-col justify-between">
-          <div className="space-y-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+    <main className="min-h-svh px-5 py-5 md:px-8 md:py-8">
+      <div className="mx-auto grid min-h-[calc(100svh-2.5rem)] max-w-[1480px] gap-5 lg:grid-cols-[minmax(0,1.18fr)_420px]">
+        <section className="panel flex flex-col justify-between overflow-hidden">
+          <div className="border-b border-border px-5 py-4 md:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="page-kicker">Data Platform</p>
-                <div className="editorial-rule mt-4 max-w-28" />
+                <p className="page-label">DataPlatform</p>
+                <h1 className="mt-2 text-[clamp(2.2rem,4vw,4.4rem)] font-semibold tracking-[-0.07em] text-foreground">
+                  Internal data control
+                  <br />
+                  without the dashboard noise.
+                </h1>
               </div>
-              <span className="status-pill bg-emerald-100 text-emerald-950">
-                Session-backed
-              </span>
+              <TypeTag>session-backed</TypeTag>
             </div>
-
-            <div className="max-w-4xl">
-              <p className="page-kicker">Internal data operations</p>
-              <h1 className="page-title mt-5">
-                Make scattered systems answer to one calm control surface.
-              </h1>
-              <p className="page-copy mt-6">
-                Sign in to connect sources, shape endpoint-backed queries, and
-                run pipelines from a dashboard designed for operators instead of
-                template-chasing SaaS chrome.
-              </p>
-            </div>
+            <p className="page-copy mt-5 max-w-3xl">
+              Sign in to connect sources, author queries, publish endpoints, and
+              run pipelines from a tool designed to feel precise under load.
+            </p>
           </div>
 
-          <div className="stagger-fade mt-12 grid gap-4 md:grid-cols-3">
-            {capabilityCards.map(({ description, index, title }) => (
-              <article
-                key={title}
-                className="section-panel-muted min-h-44 transition-transform duration-200 hover:-translate-y-1"
-              >
-                <p className="page-kicker">{index}</p>
-                <h2 className="mt-5 text-2xl tracking-[-0.03em]">{title}</h2>
-                <p className="mt-4 text-sm leading-7 text-muted-foreground">
-                  {description}
+          <div className="grid flex-1 gap-0 md:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="border-b border-border px-5 py-5 md:border-b-0 md:border-r md:px-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                {capabilityRows.map((item) => (
+                  <article key={item.code} className="border border-border bg-surface-raised px-4 py-4">
+                    <p className="mono-value text-secondary">{item.code}</p>
+                    <h2 className="mt-4 text-base font-medium tracking-[-0.03em]">
+                      {item.title}
+                    </h2>
+                    <p className="mt-3 text-sm leading-7 text-secondary">
+                      {item.description}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-between bg-surface-subtle px-5 py-5 md:px-6">
+              <div>
+                <p className="page-label">Access</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em]">
+                  Enter the operations desk
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-secondary">
+                  Use the local bootstrap account while the environment is still
+                  being wired up.
                 </p>
-              </article>
-            ))}
-          </div>
-        </section>
+              </div>
 
-        <section className="section-panel flex items-center justify-center">
-          <div className="w-full max-w-md">
-            <div className="mb-8 space-y-4">
-              <p className="page-kicker">Access</p>
-              <h2 className="section-title">Enter the operations desk</h2>
-              <p className="text-sm leading-7 text-muted-foreground">
-                Use the seeded bootstrap account while local setup is still in
-                progress.
-              </p>
-            </div>
+              <div className="my-6">
+                <LoginForm nextPath={nextPath} />
+              </div>
 
-            <LoginForm nextPath={nextPath} />
-
-            <div className="mt-8 rounded-[1.5rem] border border-dashed border-border bg-muted/45 px-4 py-4 text-sm leading-7 text-muted-foreground">
-              Default local credentials:
-              <span className="ml-2 font-medium text-foreground">
-                root / 123
-              </span>
+              <div className="border-t border-border pt-4 text-sm text-secondary">
+                <p className="page-label">Local Credentials</p>
+                <p className="mt-2 font-mono text-foreground">root / 123</p>
+              </div>
             </div>
           </div>
         </section>

@@ -7,6 +7,7 @@ import {
   ArrowUpDown,
   Columns3,
   Copy,
+  Download,
   Eye,
   EyeOff,
   Filter,
@@ -226,6 +227,7 @@ export function QueriesWorkspace() {
   const [activeTab, setActiveTab] = useState<ResultTab>("editor")
   const [executionMs, setExecutionMs] = useState<number | null>(null)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null)
+  const [selectedRowRange, setSelectedRowRange] = useState<{ start: number; end: number } | null>(null)
   const [selectedCell, setSelectedCell] = useState<{ rowIndex: number; column: string; value: unknown } | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [filters, setFilters] = useState<ResultFilter[]>([])
@@ -314,6 +316,7 @@ export function QueriesWorkspace() {
       setResults(rows)
       setExecutionMs(duration)
       setSelectedRowIndex(rows.length > 0 ? 0 : null)
+      setSelectedRowRange(null)
       setSelectedCell(null)
       setPage(1)
       setActiveTab("results")
@@ -399,6 +402,8 @@ export function QueriesWorkspace() {
   const safePage = Math.min(page, pageCount)
   const pagedRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize)
   const selectedRow = selectedRowIndex !== null ? filteredRows[selectedRowIndex] ?? null : null
+  const rangeStart = selectedRowRange ? Math.min(selectedRowRange.start, selectedRowRange.end) : null
+  const rangeEnd = selectedRowRange ? Math.max(selectedRowRange.start, selectedRowRange.end) : null
   const isRestSource = selectedSource?.type === "rest"
   const hasSources = (sourcesQuery.data?.length ?? 0) > 0
   const busy = saveMutation.isPending || runMutation.isPending
@@ -409,6 +414,7 @@ export function QueriesWorkspace() {
     setResults([])
     setExecutionMs(null)
     setSelectedRowIndex(null)
+    setSelectedRowRange(null)
     setSelectedCell(null)
     setFilters([])
     setNotice({ kind: "idle" })
@@ -426,6 +432,7 @@ export function QueriesWorkspace() {
     setResults([])
     setExecutionMs(null)
     setSelectedRowIndex(null)
+    setSelectedRowRange(null)
     setSelectedCell(null)
     setNotice({ kind: "idle" })
     setActiveTab("editor")
@@ -487,6 +494,43 @@ export function QueriesWorkspace() {
           : String(value)
     )
     setNotice({ kind: "success", message: "Cell value copied." })
+  }
+
+  function exportCsv() {
+    if (visibleColumns.length === 0) {
+      return
+    }
+
+    const escapeCsv = (value: unknown) => {
+      if (value === null || value === undefined) {
+        return ""
+      }
+      const raw = typeof value === "object" ? JSON.stringify(value) : String(value)
+      return `"${raw.replace(/"/g, '""')}"`
+    }
+
+    const lines = [
+      visibleColumns.join(","),
+      ...filteredRows.map((row) => visibleColumns.map((column) => escapeCsv(row[column])).join(",")),
+    ]
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${draft.name.trim() || "query-results"}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    setNotice({ kind: "success", message: "CSV export started." })
+  }
+
+  function handleRowSelection(rowIndex: number, shiftKey: boolean) {
+    if (shiftKey && selectedRowIndex !== null) {
+      setSelectedRowRange({ start: selectedRowIndex, end: rowIndex })
+    } else {
+      setSelectedRowRange(null)
+    }
+
+    setSelectedRowIndex(rowIndex)
   }
 
   function startResize(column: string, event: React.MouseEvent<HTMLButtonElement>) {
@@ -724,6 +768,10 @@ export function QueriesWorkspace() {
                       {filteredRows.length.toLocaleString()} rows{executionMs ? ` / ${executionMs}ms` : ""}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      <Button onClick={exportCsv} size="sm" type="button" variant="ghost">
+                        <Download className="size-4" />
+                        Export CSV
+                      </Button>
                       <Button onClick={() => setColumnMenuOpen((current) => !current)} size="sm" type="button" variant="ghost">
                         <Columns3 className="size-4" />
                         Columns
@@ -842,7 +890,7 @@ export function QueriesWorkspace() {
                                 return (
                                   <th
                                     key={column}
-                                    className="relative min-w-[160px] border-r border-border bg-surface-raised px-3 py-2 text-left"
+                                    className="group relative min-w-[160px] border-r border-border bg-surface-raised px-3 py-2 text-left"
                                     draggable
                                     onDragOver={(event) => event.preventDefault()}
                                     onDragStart={(event) => event.dataTransfer.setData("text/plain", column)}
@@ -876,6 +924,17 @@ export function QueriesWorkspace() {
                                         <span className="mono-value text-secondary">{type}</span>
                                       </span>
                                       <span className="mt-0.5 flex items-center gap-1 text-secondary">
+                                        <button
+                                          className="inline-flex items-center opacity-0 transition-opacity group-hover:opacity-100"
+                                          onClick={(event) => {
+                                            event.stopPropagation()
+                                            setFiltersOpen(true)
+                                            setFilters((current) => current.some((item) => item.column === column) ? current : [...current, createFilter(column)])
+                                          }}
+                                          type="button"
+                                        >
+                                          <Filter className="size-3.5" />
+                                        </button>
                                         <GripVertical className="size-3.5" />
                                         <ArrowUpDown className={cn("size-3.5", isSorted && "text-foreground")} />
                                       </span>
@@ -889,13 +948,13 @@ export function QueriesWorkspace() {
                           <tbody>
                             {pagedRows.map((row, rowIndex) => {
                               const absoluteIndex = (safePage - 1) * pageSize + rowIndex
-                              const rowSelected = selectedRowIndex === absoluteIndex
+                              const rowSelected = selectedRowIndex === absoluteIndex || (rangeStart !== null && rangeEnd !== null && absoluteIndex >= rangeStart && absoluteIndex <= rangeEnd)
 
                               return (
                                 <tr
                                   key={`result-row-${absoluteIndex}`}
                                   className={cn("data-row", rowSelected && "data-row-selected")}
-                                  onClick={() => setSelectedRowIndex(absoluteIndex)}
+                                  onClick={(event) => handleRowSelection(absoluteIndex, event.shiftKey)}
                                 >
                                   <td className="sticky left-0 z-10 w-10 border-r border-border bg-inherit px-2 text-right text-secondary">{absoluteIndex + 1}</td>
                                   {visibleColumns.map((column) => {
@@ -913,7 +972,7 @@ export function QueriesWorkspace() {
                                         )}
                                         onClick={(event) => {
                                           event.stopPropagation()
-                                          setSelectedRowIndex(absoluteIndex)
+                                          handleRowSelection(absoluteIndex, false)
                                           setSelectedCell({ rowIndex: absoluteIndex, column, value })
                                         }}
                                         title={value === null || value === undefined ? "NULL" : typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}
@@ -1094,4 +1153,3 @@ function Field({
     </label>
   )
 }
-

@@ -6,6 +6,7 @@ import {
   type LoginFormState,
   loginWithUsername,
 } from "@/app/(auth)/login/actions"
+import { InlineBanner } from "@/components/dashboard/platform-ui"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -24,49 +25,40 @@ export function LoginForm({ nextPath }: LoginFormProps) {
   )
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} className="space-y-5">
       <input name="next" type="hidden" value={nextPath ?? "/dashboard"} />
-      <div className="space-y-2">
-        <label className="page-kicker" htmlFor="username">
-          Username
-        </label>
+
+      <label className="field-stack" htmlFor="username">
+        <span className="field-label">Username</span>
         <Input
-          id="username"
-          name="username"
           autoComplete="username"
           autoFocus
+          id="username"
+          name="username"
           placeholder="root"
           required
         />
-      </div>
+      </label>
 
-      <div className="space-y-2">
-        <label className="page-kicker" htmlFor="password">
-          Password
-        </label>
+      <label className="field-stack" htmlFor="password">
+        <span className="field-label">Password</span>
         <Input
+          autoComplete="current-password"
           id="password"
           name="password"
-          type="password"
-          autoComplete="current-password"
           placeholder="Enter your password"
           required
+          type="password"
         />
-      </div>
+      </label>
 
       {state.error ? (
-        <p className="rounded-[1.25rem] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {state.error}
-        </p>
+        <InlineBanner tone="error">{state.error}</InlineBanner>
       ) : null}
 
-      <Button
-        className="w-full justify-between"
-        disabled={isPending}
-        size="lg"
-        type="submit"
-      >
-        {isPending ? "Signing in..." : "Sign in"}
+      <Button className="w-full justify-between" disabled={isPending} type="submit">
+        <span>{isPending ? "Signing in..." : "Sign in"}</span>
+        <span className="mono-value text-[inherit]">access</span>
       </Button>
     </form>
   )

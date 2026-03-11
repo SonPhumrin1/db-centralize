@@ -222,7 +222,8 @@
   }
 
   .panel {
-    @apply rounded-[10px] border border-border bg-surface;
+    @apply rounded-[10px] border border-border;
+    background-color: var(--surface);
   }
 
   .panel-header {
@@ -242,7 +243,8 @@
   }
 
   .table-wrap {
-    @apply overflow-hidden rounded-[10px] border border-border bg-surface;
+    @apply overflow-hidden rounded-[10px] border border-border;
+    background-color: var(--surface);
   }
 
   .data-table {
@@ -250,7 +252,8 @@
   }
 
   .data-table thead th {
-    @apply sticky top-0 z-10 border-b border-border bg-surface-raised px-3 py-2 text-left align-bottom;
+    @apply sticky top-0 z-10 border-b border-border px-3 py-2 text-left align-bottom;
+    background-color: var(--surface-raised);
     color: var(--secondary);
     font-size: 11px;
     font-weight: 600;

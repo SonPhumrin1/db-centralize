@@ -2,6 +2,7 @@ import { ArrowLeft, Database, Globe, Table } from "lucide-react"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 
+import { StatusBadge, TypeTag } from "@/components/dashboard/platform-ui"
 import { Button } from "@/components/ui/button"
 import type { DataSource, SchemaResult } from "@/lib/datasources"
 import { backendFetch } from "@/lib/platform-server"
@@ -40,6 +41,16 @@ async function getSourceData(id: string) {
   }
 }
 
+function statusTone(status: string) {
+  if (status === "connected") {
+    return "success"
+  }
+  if (status === "error") {
+    return "error"
+  }
+  return "warning"
+}
+
 export default async function SourceDetailPage({ params }: SourcePageProps) {
   const session = await getServerSession()
 
@@ -49,165 +60,132 @@ export default async function SourceDetailPage({ params }: SourcePageProps) {
 
   const { id } = await params
   const { schema, source } = await getSourceData(id)
+  const sourceSummary =
+    source.type === "rest"
+      ? source.summary.baseUrl ?? "Base URL missing"
+      : `${source.summary.host ?? "host missing"}:${source.summary.port ?? "-"}`
 
   return (
-    <main className="space-y-6 px-2 py-2 md:px-0 md:py-4">
-      <section className="page-shell">
-        <Link
-          href="/dashboard/sources"
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to sources
-        </Link>
-
-        <div className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="rounded-full bg-stone-100 p-3 text-stone-900">
-                {source.type === "rest" ? (
-                  <Globe className="size-5" />
-                ) : (
-                  <Database className="size-5" />
-                )}
-              </span>
-              <div>
-                <p className="page-kicker">{source.type}</p>
-                <h1 className="section-title mt-3">{source.name}</h1>
-              </div>
-            </div>
-            <p className="max-w-3xl text-sm leading-7 text-muted-foreground">
-              Review connection health, usage timestamps, and the full
-              discovered schema for this source.
-            </p>
-          </div>
-
-          <div
-            className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold uppercase ${
-              source.status === "connected"
-                ? "bg-emerald-100 text-emerald-900"
-                : "bg-amber-100 text-amber-900"
-            }`}
+    <main className="workspace-main space-y-5">
+      <header className="page-header">
+        <div className="space-y-3">
+          <Link
+            className="inline-flex items-center gap-2 text-sm text-secondary transition-colors hover:text-foreground"
+            href="/dashboard/sources"
           >
-            {source.status}
+            <ArrowLeft className="size-4" />
+            Back to sources
+          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <TypeTag>{source.type === "rest" ? "REST" : source.type}</TypeTag>
+            <StatusBadge label={source.status} tone={statusTone(source.status)} />
           </div>
+          <h1 className="page-title">{source.name}</h1>
+          <p className="page-copy">
+            Review connection health, usage timestamps, and discovered schema for this source.
+          </p>
         </div>
-      </section>
+        <Button asChild type="button" variant="outline">
+          <Link href="/dashboard/queries">Open query manager</Link>
+        </Button>
+      </header>
 
-      <section className="grid gap-5 lg:grid-cols-3">
-        <article className="rounded-[1.7rem] border border-border/70 bg-background/92 p-5 shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground">
-            Connection
+      <section className="stat-strip">
+        <div className="stat-cell">
+          <p className="page-label">Connection</p>
+          <p className="mt-3 font-mono text-sm text-foreground">{sourceSummary}</p>
+          <p className="mt-1 text-sm text-secondary">
+            {source.type === "rest"
+              ? `Auth ${source.summary.authType ?? "none"}`
+              : source.summary.database ?? "Database missing"}
           </p>
-          <div className="mt-4 text-sm leading-7 text-foreground">
-            {source.type === "rest" ? (
-              <>
-                <p className="font-medium">
-                  {source.summary.baseUrl ?? "Base URL missing"}
-                </p>
-                <p className="text-muted-foreground">
-                  Auth type: {source.summary.authType ?? "none"}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="font-medium">
-                  {source.summary.host}:{source.summary.port}
-                </p>
-                <p className="text-muted-foreground">
-                  {source.summary.database}
-                </p>
-              </>
-            )}
-          </div>
-        </article>
-
-        <article className="rounded-[1.7rem] border border-border/70 bg-background/92 p-5 shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground">
-            Last tested
-          </p>
-          <p className="mt-4 text-lg font-semibold">
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Last tested</p>
+          <p className="mt-3 font-mono text-sm text-foreground">
             {source.lastTestedAt
               ? new Date(source.lastTestedAt).toLocaleString()
               : "Never"}
           </p>
-        </article>
-
-        <article className="rounded-[1.7rem] border border-border/70 bg-background/92 p-5 shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground">
-            Last queried
-          </p>
-          <p className="mt-4 text-lg font-semibold">
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Last queried</p>
+          <p className="mt-3 font-mono text-sm text-foreground">
             {source.lastQueriedAt
               ? new Date(source.lastQueriedAt).toLocaleString()
               : "No executions yet"}
           </p>
-        </article>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Schema objects</p>
+          <p className="mt-3 font-mono text-sm text-foreground">
+            {source.type === "rest"
+              ? "N/A"
+              : `${schema?.tables.length ?? 0} tables / ${schema?.columns.length ?? 0} cols`}
+          </p>
+        </div>
       </section>
 
       {source.type === "rest" ? (
-        <section className="rounded-[1.85rem] border border-border/70 bg-background/92 p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="rounded-full bg-sky-100 p-3 text-sky-900">
-              <Globe className="size-5" />
+        <section className="panel">
+          <div className="panel-body flex items-start gap-3">
+            <span className="mt-0.5 inline-flex size-10 items-center justify-center border border-border bg-surface-raised text-[color:var(--accent)]">
+              <Globe className="size-4" />
             </span>
             <div>
-              <h2 className="text-xl font-semibold">REST source</h2>
-              <p className="text-sm text-muted-foreground">
-                REST sources do not expose relational schema metadata.
+              <p className="page-label">REST source</p>
+              <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+                No relational schema to browse
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-secondary">
+                REST sources expose request structure instead of tables and columns. Use the
+                query workbench or pipeline source node to shape requests against this system.
               </p>
             </div>
           </div>
         </section>
       ) : (
-        <section className="rounded-[1.85rem] border border-border/70 bg-background/92 p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
+        <section className="panel overflow-hidden">
+          <div className="panel-header">
             <div className="flex items-center gap-3">
-              <span className="rounded-full bg-emerald-100 p-3 text-emerald-900">
-                <Table className="size-5" />
+              <span className="inline-flex size-10 items-center justify-center border border-border bg-surface-raised text-[color:var(--accent)]">
+                <Table className="size-4" />
               </span>
               <div>
-                <h2 className="text-xl font-semibold">Schema browser</h2>
-                <p className="text-sm text-muted-foreground">
-                  {schema?.tables.length ?? 0} tables and{" "}
-                  {schema?.columns.length ?? 0} columns discovered from
-                  `information_schema`.
-                </p>
+                <p className="page-label">Schema browser</p>
+                <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                  information_schema snapshot
+                </h2>
               </div>
             </div>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/queries">Open query manager</Link>
-            </Button>
+            <p className="mono-value text-secondary">
+              {schema?.tables.length ?? 0} tables / {schema?.columns.length ?? 0} columns
+            </p>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            {schema?.tables.map((table) => (
-              <span
-                key={table}
-                className="rounded-full border border-border bg-stone-50 px-3 py-1 text-sm font-medium"
-              >
-                {table}
-              </span>
-            ))}
+          <div className="border-b border-border px-4 py-3">
+            <div className="flex flex-wrap gap-2">
+              {schema?.tables.map((table) => (
+                <TypeTag key={table}>{table}</TypeTag>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-[1.4rem] border border-border/70">
-            <table className="min-w-full divide-y divide-border/70 text-sm">
-              <thead className="bg-stone-100/80 text-left text-muted-foreground">
+          <div className="overflow-auto">
+            <table className="data-table min-w-full">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-medium">Table</th>
-                  <th className="px-4 py-3 font-medium">Column</th>
-                  <th className="px-4 py-3 font-medium">Type</th>
+                  <th>Table</th>
+                  <th>Column</th>
+                  <th>Type</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/70 bg-background">
+              <tbody>
                 {schema?.columns.map((column) => (
-                  <tr key={`${column.table}:${column.name}`}>
-                    <td className="px-4 py-3 font-medium">{column.table}</td>
-                    <td className="px-4 py-3">{column.name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {column.dataType}
-                    </td>
+                  <tr key={`${column.table}:${column.name}`} className="data-row">
+                    <td className="font-medium">{column.table}</td>
+                    <td className="font-mono text-[13px]">{column.name}</td>
+                    <td className="font-mono text-[13px] text-secondary">{column.dataType}</td>
                   </tr>
                 ))}
               </tbody>
@@ -215,6 +193,39 @@ export default async function SourceDetailPage({ params }: SourcePageProps) {
           </div>
         </section>
       )}
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <article className="panel">
+          <div className="panel-body flex items-start gap-3">
+            <span className="inline-flex size-10 items-center justify-center border border-border bg-surface-raised text-[color:var(--accent)]">
+              <Database className="size-4" />
+            </span>
+            <div>
+              <p className="page-label">Connection shape</p>
+              <p className="mt-2 text-sm leading-7 text-secondary">
+                Keep credentials and auth on the source record so queries and pipelines can stay
+                transport-focused.
+              </p>
+            </div>
+          </div>
+        </article>
+        <article className="panel">
+          <div className="panel-body">
+            <p className="page-label">Usage</p>
+            <p className="mt-2 text-sm leading-7 text-secondary">
+              Use `Last queried` to spot dormant integrations before they drift or lose access.
+            </p>
+          </div>
+        </article>
+        <article className="panel">
+          <div className="panel-body">
+            <p className="page-label">Next step</p>
+            <p className="mt-2 text-sm leading-7 text-secondary">
+              Open Queries to run against this source, or Pipelines to feed it into a node graph.
+            </p>
+          </div>
+        </article>
+      </section>
     </main>
   )
 }

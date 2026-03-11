@@ -1,6 +1,15 @@
 "use client"
 
-import { ArrowLeftRight, Bot, Database, FileText, Filter, GitMerge, Send, SendToBack } from "lucide-react"
+import {
+  ArrowLeftRight,
+  Bot,
+  Database,
+  FileText,
+  Filter,
+  GitMerge,
+  Send,
+  SendToBack,
+} from "lucide-react"
 
 import { RestRequestBuilder } from "@/components/shared/rest-request-builder"
 import { Button } from "@/components/ui/button"
@@ -48,9 +57,14 @@ export function PipelineConfigDrawer({
 
   if (!node) {
     return (
-      <aside className="h-full rounded-[2rem] border border-border/70 bg-background/95 p-5 shadow-sm">
-        <p className="text-sm font-medium text-muted-foreground">Node config</p>
-        <div className="mt-4 rounded-[1.4rem] border border-dashed border-border/80 bg-muted/30 px-4 py-6 text-sm leading-6 text-muted-foreground">
+      <aside className="panel h-full">
+        <div className="panel-header">
+          <div>
+            <p className="page-label">Node config</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Inspector</h2>
+          </div>
+        </div>
+        <div className="panel-body text-sm leading-7 text-secondary">
           Click a node on the canvas to edit its configuration.
         </div>
       </aside>
@@ -61,16 +75,20 @@ export function PipelineConfigDrawer({
   const icon = iconForKind(node.data.kind)
 
   return (
-    <aside className="h-full overflow-y-auto rounded-[2rem] border border-border/70 bg-background/95 p-5 shadow-sm">
-      <div className="flex items-center gap-3">
-        <span className="rounded-full bg-stone-100 p-2">{icon}</span>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Node config</p>
-          <h2 className="text-lg font-semibold">{node.data.label}</h2>
+    <aside className="panel h-full overflow-y-auto">
+      <div className="panel-header">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex size-10 items-center justify-center border border-border bg-surface-raised text-[color:var(--accent)]">
+            {icon}
+          </span>
+          <div>
+            <p className="page-label">Node config</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">{node.data.label}</h2>
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 space-y-5">
+      <div className="space-y-5 p-4">
         {node.data.kind === "source" ? (
           <SourceConfigSection
             node={node}
@@ -140,13 +158,10 @@ function SourceConfigSection({
     sources.find((source) => source.id === config.dataSourceId) ?? null
 
   return (
-    <section className="space-y-3">
-      <label className="text-sm font-medium" htmlFor={`source-${node.id}`}>
-        Data source
-      </label>
-      <select
-        className="flex h-10 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+    <section className="space-y-4">
+      <SelectField
         id={`source-${node.id}`}
+        label="Data source"
         onChange={(event) =>
           updateNodeConfig<"source">(node.id, (current) => {
             const nextSourceId = event.target.value ? Number(event.target.value) : null
@@ -173,29 +188,28 @@ function SourceConfigSection({
             {source.name}
           </option>
         ))}
-      </select>
+      </SelectField>
 
       {selectedSource?.type === "rest" ? (
-        <div className="space-y-3 rounded-[1.4rem] border border-border/70 bg-background/70 p-4">
-          <div>
-            <p className="text-sm font-medium">REST request</p>
-            <p className="text-xs leading-5 text-muted-foreground">
-              Run uses the saved canvas. Keep the datasource auth on the source
-              itself and only set request-specific overrides here.
-            </p>
+        <section className="rounded-[8px] border border-border bg-surface-raised px-4 py-4">
+          <p className="page-label">REST request</p>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Datasource auth stays on the source itself. Configure only request-specific overrides here.
+          </p>
+          <div className="mt-4">
+            <RestRequestBuilder
+              onChange={(restRequest) =>
+                updateNodeConfig<"source">(node.id, (current) => ({
+                  ...current,
+                  restRequest,
+                  queryBody: serializeRestRequest(restRequest),
+                }))
+              }
+              request={config.restRequest}
+              source={selectedSource}
+            />
           </div>
-          <RestRequestBuilder
-            onChange={(restRequest) =>
-              updateNodeConfig<"source">(node.id, (current) => ({
-                ...current,
-                restRequest,
-                queryBody: serializeRestRequest(restRequest),
-              }))
-            }
-            request={config.restRequest}
-            source={selectedSource}
-          />
-        </div>
+        </section>
       ) : (
         <Field
           label="SQL query"
@@ -211,10 +225,9 @@ function SourceConfigSection({
       )}
 
       {selectedSource?.status === "token_expired" ? (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
-          This source reports an expired token. Update its credentials before running the
-          pipeline.
-        </div>
+        <NoticeBox tone="warning">
+          This source reports an expired token. Update its credentials before running the pipeline.
+        </NoticeBox>
       ) : null}
     </section>
   )
@@ -230,7 +243,7 @@ function FilterConfigSection({
   const config = node.data.config as FilterNodeConfig
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <Field
         label="Column"
         onChange={(value) =>
@@ -241,28 +254,23 @@ function FilterConfigSection({
         }
         value={config.column}
       />
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor={`operator-${node.id}`}>
-          Operator
-        </label>
-        <select
-          className="flex h-10 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          id={`operator-${node.id}`}
-          onChange={(event) =>
-            updateNodeConfig<"filter">(node.id, (current) => ({
-              ...current,
-              operator: event.target.value as typeof current.operator,
-            }))
-          }
-          value={config.operator}
-        >
-          {filterOperatorOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SelectField
+        id={`operator-${node.id}`}
+        label="Operator"
+        onChange={(event) =>
+          updateNodeConfig<"filter">(node.id, (current) => ({
+            ...current,
+            operator: event.target.value as typeof current.operator,
+          }))
+        }
+        value={config.operator}
+      >
+        {filterOperatorOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
       <Field
         label="Value"
         onChange={(value) =>
@@ -287,9 +295,12 @@ function TransformConfigSection({
   const config = node.data.config as TransformNodeConfig
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium">Column mappings</p>
+        <div>
+          <p className="page-label">Column mappings</p>
+          <p className="mt-1 text-sm text-secondary">Rename or drop fields as rows move downstream.</p>
+        </div>
         <Button
           onClick={() =>
             updateNodeConfig<"transform">(node.id, (current) => ({
@@ -351,11 +362,10 @@ function JoinConfigSection({
   const config = node.data.config as JoinNodeConfig
 
   return (
-    <section className="space-y-3">
-      <div className="rounded-xl border border-border/70 bg-stone-50 px-3 py-3 text-sm text-muted-foreground">
-        Incoming edges detected: {incomingCount}. Join expects exactly two
-        upstream inputs and will fail until both connections are saved.
-      </div>
+    <section className="space-y-4">
+      <NoticeBox tone="info">
+        Incoming edges detected: {incomingCount}. Join expects exactly two upstream inputs.
+      </NoticeBox>
       <Field
         label="Join key"
         onChange={(value) =>
@@ -366,28 +376,23 @@ function JoinConfigSection({
         }
         value={config.joinKey}
       />
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor={`join-type-${node.id}`}>
-          Join type
-        </label>
-        <select
-          className="flex h-10 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          id={`join-type-${node.id}`}
-          onChange={(event) =>
-            updateNodeConfig<"join">(node.id, (current) => ({
-              ...current,
-              joinType: event.target.value as typeof current.joinType,
-            }))
-          }
-          value={config.joinType}
-        >
-          {joinTypeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SelectField
+        id={`join-type-${node.id}`}
+        label="Join type"
+        onChange={(event) =>
+          updateNodeConfig<"join">(node.id, (current) => ({
+            ...current,
+            joinType: event.target.value as typeof current.joinType,
+          }))
+        }
+        value={config.joinType}
+      >
+        {joinTypeOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
     </section>
   )
 }
@@ -403,7 +408,13 @@ function OutputConfigSection({
 
   return (
     <section className="space-y-4">
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center justify-between gap-3 border border-border bg-surface-raised px-4 py-3 text-sm">
+        <div>
+          <p className="field-label">Endpoint draft</p>
+          <p className="mt-1 text-secondary">
+            Expose this output as an endpoint when backend support is available.
+          </p>
+        </div>
         <input
           checked={config.exposeAsEndpoint}
           className="size-4 rounded border-border"
@@ -415,7 +426,6 @@ function OutputConfigSection({
           }
           type="checkbox"
         />
-        Expose this output as an endpoint when the backend supports pipeline endpoints
       </label>
 
       {config.exposeAsEndpoint ? (
@@ -448,23 +458,22 @@ function TelegramTriggerConfigSection({
   const config = node.data.config as TelegramTriggerNodeConfig
 
   return (
-    <section className="space-y-3">
-      <div className="rounded-xl border border-border/70 bg-stone-50 px-3 py-3 text-sm text-muted-foreground">
-        Trigger nodes start a pipeline from Telegram webhooks. For manual runs,
-        add a mock event JSON payload or the backend will inject a default
-        `/start` event.
-      </div>
+    <section className="space-y-4">
+      <NoticeBox tone="info">
+        Trigger nodes start a pipeline from Telegram webhooks. For manual runs, add a mock event
+        payload or the backend will inject a default `/start` event.
+      </NoticeBox>
       <TelegramIntegrationSelect
         id={`telegram-trigger-${node.id}`}
         label="Telegram integration"
-        telegramIntegrations={telegramIntegrations}
-        value={config.telegramIntegrationId}
         onChange={(value) =>
           updateNodeConfig<"telegram-trigger">(node.id, (current) => ({
             ...current,
             telegramIntegrationId: value,
           }))
         }
+        telegramIntegrations={telegramIntegrations}
+        value={config.telegramIntegrationId}
       />
       <Field
         label="Command filter"
@@ -499,10 +508,10 @@ function TelegramTriggerConfigSection({
         placeholder='{"telegram_message_text":"/orders","telegram_command":"/orders","telegram_from_username":"operator"}'
         value={config.mockEventJson}
       />
-      <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3 text-sm leading-6 text-muted-foreground">
-        Leave <code className="mx-1">telegram_chat_id</code> out of the mock payload if you want
-        the send node to use the integration&apos;s saved default chat ID.
-      </div>
+      <NoticeBox tone="info">
+        Leave `telegram_chat_id` out of the mock payload if you want the send node to use the
+        integration&apos;s saved default chat ID.
+      </NoticeBox>
     </section>
   )
 }
@@ -517,13 +526,11 @@ function TelegramTemplateConfigSection({
   const config = node.data.config as TelegramTemplateNodeConfig
 
   return (
-    <section className="space-y-3">
-      <div className="rounded-xl border border-border/70 bg-stone-50 px-3 py-3 text-sm text-muted-foreground">
-        Template placeholders read input row fields, for example{" "}
-        <code>{"{{telegram_from_username}}"}</code>,{" "}
-        <code>{"{{order_code}}"}</code>, or{" "}
-        <code>{"{{customer.name}}"}</code>.
-      </div>
+    <section className="space-y-4">
+      <NoticeBox tone="info">
+        Template placeholders read input row fields, for example `{'{{telegram_from_username}}'}`,
+        `{'{{order_code}}'}`, or `{'{{customer.name}}'}`.
+      </NoticeBox>
       <Field
         label="Output field"
         onChange={(value) =>
@@ -562,24 +569,22 @@ function TelegramSendConfigSection({
   const config = node.data.config as TelegramSendNodeConfig
 
   return (
-    <section className="space-y-3">
-      <div className="rounded-xl border border-border/70 bg-stone-50 px-3 py-3 text-sm text-muted-foreground">
-        Send target priority is:
-        <span className="font-medium text-foreground"> Override chat ID</span>,
-        then <code className="mx-1">telegram_chat_id</code> from the input row,
-        then the integration&apos;s saved default chat ID.
-      </div>
+    <section className="space-y-4">
+      <NoticeBox tone="info">
+        Send target priority is override chat ID, then `telegram_chat_id` from the input row, then
+        the integration&apos;s saved default chat ID.
+      </NoticeBox>
       <TelegramIntegrationSelect
         id={`telegram-send-${node.id}`}
         label="Telegram integration"
-        telegramIntegrations={telegramIntegrations}
-        value={config.telegramIntegrationId}
         onChange={(value) =>
           updateNodeConfig<"telegram-send">(node.id, (current) => ({
             ...current,
             telegramIntegrationId: value,
           }))
         }
+        telegramIntegrations={telegramIntegrations}
+        value={config.telegramIntegrationId}
       />
       <Field
         label="Message field"
@@ -603,30 +608,21 @@ function TelegramSendConfigSection({
         placeholder="-1001234567890"
         value={config.chatId}
       />
-      <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3 text-sm leading-6 text-muted-foreground">
-        If sends only work when this field is filled, your integration default chat ID or the
-        incoming mock row is not the value you expect.
-      </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor={`telegram-parse-mode-${node.id}`}>
-          Parse mode
-        </label>
-        <select
-          className="flex h-10 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          id={`telegram-parse-mode-${node.id}`}
-          onChange={(event) =>
-            updateNodeConfig<"telegram-send">(node.id, (current) => ({
-              ...current,
-              parseMode: event.target.value as TelegramSendNodeConfig["parseMode"],
-            }))
-          }
-          value={config.parseMode}
-        >
-          <option value="">Plain text</option>
-          <option value="MarkdownV2">MarkdownV2</option>
-          <option value="HTML">HTML</option>
-        </select>
-      </div>
+      <SelectField
+        id={`telegram-parse-mode-${node.id}`}
+        label="Parse mode"
+        onChange={(event) =>
+          updateNodeConfig<"telegram-send">(node.id, (current) => ({
+            ...current,
+            parseMode: event.target.value as TelegramSendNodeConfig["parseMode"],
+          }))
+        }
+        value={config.parseMode}
+      >
+        <option value="">Plain text</option>
+        <option value="MarkdownV2">MarkdownV2</option>
+        <option value="HTML">HTML</option>
+      </SelectField>
     </section>
   )
 }
@@ -635,37 +631,28 @@ function OutputPreview({ rows }: { rows: PipelineRow[] }) {
   const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
 
   if (rows.length === 0) {
-    return (
-      <div className="rounded-[1.4rem] border border-dashed border-border/80 bg-muted/30 px-4 py-6 text-sm leading-6 text-muted-foreground">
-        Save first, then run the pipeline to preview output rows here.
-      </div>
-    )
+    return <NoticeBox tone="info">Save first, then run the pipeline to preview output rows here.</NoticeBox>
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium">Output preview</p>
-      <div className="overflow-x-auto rounded-[1.4rem] border border-border/70">
-        <table className="min-w-full border-separate border-spacing-0 text-sm">
+      <p className="page-label">Output preview</p>
+      <div className="overflow-x-auto border border-border bg-surface">
+        <table className="data-table min-w-full">
           <thead>
             <tr>
               {columns.map((column) => (
-                <th
-                  key={column}
-                  className="border-b border-border bg-stone-50 px-3 py-2 text-left font-medium"
-                >
-                  {column}
-                </th>
+                <th key={column}>{column}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
-              <tr key={`output-row-${index}`}>
+              <tr key={`output-row-${index}`} className="data-row">
                 {columns.map((column) => (
                   <td
                     key={`${index}-${column}`}
-                    className="border-b border-border/70 px-3 py-2 align-top text-muted-foreground"
+                    className="font-mono text-[13px] text-secondary"
                   >
                     {formatValue(row[column])}
                   </td>
@@ -691,14 +678,14 @@ function Field({
   placeholder?: string
 }) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+    <label className="field-stack">
+      <span className="field-label">{label}</span>
       <Input
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         value={value}
       />
-    </div>
+    </label>
   )
 }
 
@@ -714,15 +701,38 @@ function TextAreaField({
   placeholder?: string
 }) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+    <label className="field-stack">
+      <span className="field-label">{label}</span>
       <textarea
-        className="min-h-28 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm leading-6 shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="field-textarea min-h-28"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         value={value}
       />
-    </div>
+    </label>
+  )
+}
+
+function SelectField({
+  id,
+  label,
+  children,
+  onChange,
+  value,
+}: {
+  id: string
+  label: string
+  children: React.ReactNode
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void
+  value: string | number
+}) {
+  return (
+    <label className="field-stack" htmlFor={id}>
+      <span className="field-label">{label}</span>
+      <select className="field-select" id={id} onChange={onChange} value={value}>
+        {children}
+      </select>
+    </label>
   )
 }
 
@@ -740,24 +750,19 @@ function TelegramIntegrationSelect({
   onChange: (value: number | null) => void
 }) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium" htmlFor={id}>
-        {label}
-      </label>
-      <select
-        className="flex h-10 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        id={id}
-        onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}
-        value={value ?? ""}
-      >
-        <option value="">Select a Telegram bot</option>
-        {telegramIntegrations.map((integration) => (
-          <option key={integration.id} value={integration.id}>
-            {integration.name}
-          </option>
-        ))}
-      </select>
-    </div>
+    <SelectField
+      id={id}
+      label={label}
+      onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}
+      value={value ?? ""}
+    >
+      <option value="">Select a Telegram bot</option>
+      {telegramIntegrations.map((integration) => (
+        <option key={integration.id} value={integration.id}>
+          {integration.name}
+        </option>
+      ))}
+    </SelectField>
   )
 }
 
@@ -771,7 +776,7 @@ function TransformMappingRow({
   onRemove: () => void
 }) {
   return (
-    <div className="rounded-[1.4rem] border border-border/70 bg-stone-50/70 p-3">
+    <div className="border border-border bg-surface-raised px-3 py-3">
       <div className="grid gap-3">
         <Field
           label="Original name"
@@ -783,7 +788,7 @@ function TransformMappingRow({
           onChange={(value) => onChange({ ...mapping, new: value })}
           value={mapping.new}
         />
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm text-secondary">
           <input
             checked={mapping.drop}
             className="size-4 rounded border-border"
@@ -792,10 +797,30 @@ function TransformMappingRow({
           />
           Drop this column
         </label>
-        <Button onClick={onRemove} size="sm" type="button" variant="outline">
+        <Button onClick={onRemove} size="sm" type="button" variant="ghost">
           Remove mapping
         </Button>
       </div>
+    </div>
+  )
+}
+
+function NoticeBox({
+  children,
+  tone,
+}: {
+  children: React.ReactNode
+  tone: "info" | "warning"
+}) {
+  return (
+    <div
+      className={
+        tone === "warning"
+          ? "rounded-[8px] border border-[color:color-mix(in_oklab,var(--warning)_40%,transparent)] bg-[color:color-mix(in_oklab,var(--warning)_10%,transparent)] px-4 py-3 text-sm leading-7 text-foreground"
+          : "rounded-[8px] border border-border bg-surface-raised px-4 py-3 text-sm leading-7 text-secondary"
+      }
+    >
+      {children}
     </div>
   )
 }
