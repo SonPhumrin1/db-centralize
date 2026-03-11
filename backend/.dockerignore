@@ -1,0 +1,4 @@
+# Ignore local backend artifacts during Docker builds.
+.git
+bin
+coverage.out

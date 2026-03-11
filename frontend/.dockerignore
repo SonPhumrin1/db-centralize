@@ -1,0 +1,4 @@
+# Ignore local frontend artifacts during Docker builds.
+.git
+.next
+node_modules
