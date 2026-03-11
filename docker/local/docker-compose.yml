@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgres:16.8
+    environment:
+      POSTGRES_DB: dataplatform
+      POSTGRES_USER: dp
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - dataplatform-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dp -d dataplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ../../backend
+    env_file:
+      - ./.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build:
+      context: ../../frontend
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+        BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        INTERNAL_API_URL: ${INTERNAL_API_URL}
+    env_file:
+      - ./.env
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then((response) => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  sample-postgres:
+    image: postgres:16.8
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_USER: sample
+      POSTGRES_PASSWORD: sample
+    volumes:
+      - ./sample-postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - sample-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sample -d analytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sample-mysql:
+    image: mysql:8.4.3
+    environment:
+      MYSQL_DATABASE: analytics
+      MYSQL_USER: sample
+      MYSQL_PASSWORD: sample
+      MYSQL_ROOT_PASSWORD: root
+    command: ["mysqld", "--mysql-native-password=ON"]
+    volumes:
+      - ./sample-mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - sample-mysql-data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u sample -psample"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  sample-rest:
+    build:
+      context: ./sample-rest
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/health >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dataplatform-pgdata:
+  sample-postgres-data:
+  sample-mysql-data:

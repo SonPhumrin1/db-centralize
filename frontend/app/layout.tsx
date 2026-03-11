@@ -1,14 +1,17 @@
-import { Geist_Mono, Inter } from "next/font/google"
-
 import "./globals.css"
+import { Fraunces, Instrument_Sans } from "next/font/google"
+import { AppQueryClientProvider } from "@/components/query-client-provider"
 import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
+import { AppToaster } from "@/components/ui/sonner"
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'})
-
-const fontMono = Geist_Mono({
+const sans = Instrument_Sans({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-sans",
+})
+
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
 })
 
 export default function RootLayout({
@@ -20,10 +23,15 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
+      className={`${sans.variable} ${display.variable} antialiased`}
     >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
+      <body className="min-h-svh">
+        <ThemeProvider>
+          <AppQueryClientProvider>
+            {children}
+            <AppToaster />
+          </AppQueryClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

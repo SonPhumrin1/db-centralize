@@ -4,9 +4,11 @@ package bootstrap
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"dataplatform/backend/internal/config"
 	"dataplatform/backend/internal/model"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -27,17 +29,50 @@ func SeedRootUser(gormDB *gorm.DB, cfg *config.Config) error {
 		return fmt.Errorf("hash bootstrap password: %w", err)
 	}
 
-	user := &model.User{
-		Username:     cfg.BootstrapUsername,
-		PasswordHash: string(passwordHash),
-		Role:         "admin",
-		IsActive:     true,
-	}
-	if err := gormDB.Create(user).Error; err != nil {
-		return fmt.Errorf("create bootstrap root user: %w", err)
+	now := time.Now().UTC()
+	displayUsername := cfg.BootstrapUsername
+
+	if err := gormDB.Transaction(func(tx *gorm.DB) error {
+		user := &model.User{
+			Name:            "Root Admin",
+			Email:           fmt.Sprintf("%s@dataplatform.local", cfg.BootstrapUsername),
+			EmailVerified:   true,
+			Username:        cfg.BootstrapUsername,
+			DisplayUsername: &displayUsername,
+			PasswordHash:    string(passwordHash),
+			Role:            "admin",
+			IsActive:        true,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		}
+		if err := tx.Create(user).Error; err != nil {
+			return fmt.Errorf("create bootstrap root user: %w", err)
+		}
+
+		accountID := cfg.BootstrapUsername
+		account := &model.Account{
+			ID:         uuid.NewString(),
+			AccountID:  accountID,
+			ProviderID: "credential",
+			UserID:     user.ID,
+			Password:   stringPtr(string(passwordHash)),
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		}
+		if err := tx.Create(account).Error; err != nil {
+			return fmt.Errorf("create bootstrap root credential account: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	log.Printf("Root user created: %s / %s - change this password immediately", cfg.BootstrapUsername, cfg.BootstrapPassword)
 
 	return nil
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

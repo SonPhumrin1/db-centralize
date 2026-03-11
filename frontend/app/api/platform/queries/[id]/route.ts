@@ -1,0 +1,25 @@
+import { forwardToBackend } from "@/lib/backend-proxy"
+
+type RouteContext = {
+  params: Promise<{
+    id: string
+  }>
+}
+
+export async function PUT(request: Request, context: RouteContext) {
+  const { id } = await context.params
+
+  return forwardToBackend({
+    path: `/api/v1/queries/${id}`,
+    request,
+  })
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const { id } = await context.params
+
+  return forwardToBackend({
+    path: `/api/v1/queries/${id}`,
+    request,
+  })
+}
