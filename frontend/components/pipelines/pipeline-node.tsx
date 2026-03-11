@@ -6,15 +6,15 @@ import { Handle, Position, type NodeProps } from "@xyflow/react"
 import { summarizeNode, type PipelineNodeData } from "@/lib/pipelines"
 import { cn } from "@/lib/utils"
 
-const kindStyles = {
-  source: "border-emerald-300 bg-emerald-50 text-emerald-900",
-  filter: "border-amber-300 bg-amber-50 text-amber-900",
-  transform: "border-sky-300 bg-sky-50 text-sky-900",
-  join: "border-violet-300 bg-violet-50 text-violet-900",
-  output: "border-stone-300 bg-stone-100 text-stone-900",
-  "telegram-trigger": "border-cyan-300 bg-cyan-50 text-cyan-900",
-  "telegram-template": "border-blue-300 bg-blue-50 text-blue-900",
-  "telegram-send": "border-rose-300 bg-rose-50 text-rose-900",
+const kindBorders = {
+  source: "border-l-[color:oklch(0.72_0.14_240)]",
+  filter: "border-l-[color:oklch(0.76_0.08_82)]",
+  transform: "border-l-[color:oklch(0.64_0.03_240)]",
+  join: "border-l-[color:oklch(0.65_0.09_310)]",
+  output: "border-l-[color:oklch(0.74_0.08_150)]",
+  "telegram-trigger": "border-l-[color:oklch(0.7_0.08_220)]",
+  "telegram-template": "border-l-[color:oklch(0.7_0.06_250)]",
+  "telegram-send": "border-l-[color:oklch(0.7_0.08_18)]",
 } as const
 
 export function PipelineNode({ data: rawData, selected }: NodeProps) {
@@ -24,9 +24,9 @@ export function PipelineNode({ data: rawData, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        "min-w-[190px] rounded-[1.4rem] border px-4 py-3 shadow-sm transition-shadow",
-        kindStyles[data.kind],
-        selected ? "shadow-lg shadow-stone-900/15" : "shadow-stone-900/5"
+        "min-w-[210px] rounded-[8px] border border-border border-l-[3px] bg-surface px-4 py-3 shadow-none transition-colors",
+        kindBorders[data.kind],
+        selected && "bg-accent-soft"
       )}
     >
       {data.kind !== "source" && data.kind !== "telegram-trigger" ? (
@@ -35,12 +35,12 @@ export function PipelineNode({ data: rawData, selected }: NodeProps) {
       {data.kind !== "output" ? <Handle position={Position.Right} type="source" /> : null}
 
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 rounded-full bg-white/70 p-2">
+        <span className="mt-0.5 text-secondary">
           <Icon className="size-4" />
         </span>
         <div className="space-y-1">
-          <p className="text-sm font-semibold">{data.label}</p>
-          <p className="max-w-[130px] text-xs leading-5 opacity-80">
+          <p className="text-sm font-medium">{data.label}</p>
+          <p className="max-w-[150px] text-xs leading-5 text-secondary">
             {summarizeNode({
               id: "",
               type: "pipelineNode",

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   ReactFlow,
@@ -25,16 +26,16 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { toast } from "sonner"
 
+import { InlineBanner, PageHeader } from "@/components/dashboard/platform-ui"
 import { PipelineConfigDrawer } from "@/components/pipelines/pipeline-config-drawer"
 import { PipelineNode } from "@/components/pipelines/pipeline-node"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { DataSource } from "@/lib/datasources"
 import {
-  parseCanvasJson,
   humanizePipelineRunError,
+  parseCanvasJson,
   parsePipelineRunRows,
   pipelineNodeOrder,
   serializeCanvasDocument,
@@ -48,8 +49,7 @@ import { usePipelineCanvasStore } from "@/store/pipeline-canvas"
 
 type NoticeState =
   | { kind: "idle" }
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string }
+  | { kind: "success" | "error"; message: string }
 
 function formatSavedTimestamp(value?: string) {
   if (!value) {
@@ -80,10 +80,7 @@ async function readErrorMessage(response: Response) {
   return payload || `Request failed with status ${response.status}`
 }
 
-async function fetchJson<T>(
-  input: RequestInfo,
-  init?: RequestInit
-): Promise<T> {
+async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     ...init,
     headers: {
@@ -114,11 +111,7 @@ const nodeIcons = {
   "telegram-send": Send,
 } as const
 
-export function PipelineCanvasWorkspace({
-  pipelineId,
-}: {
-  pipelineId: number
-}) {
+export function PipelineCanvasWorkspace({ pipelineId }: { pipelineId: number }) {
   return (
     <ReactFlowProvider>
       <PipelineCanvasWorkspaceInner pipelineId={pipelineId} />
@@ -142,25 +135,22 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
   const [name, setName] = useState("")
   const [notice, setNotice] = useState<NoticeState>({ kind: "idle" })
   const [hydratedVersion, setHydratedVersion] = useState("")
-  const [savedCanvasJson, setSavedCanvasJson] = useState(
-    serializeCanvasDocument({ nodes: [], edges: [] })
-  )
+  const [savedCanvasJson, setSavedCanvasJson] = useState(serializeCanvasDocument({ nodes: [], edges: [] }))
   const [savedName, setSavedName] = useState("")
 
   const pipelineQuery = useQuery({
     queryKey: ["pipeline", pipelineId],
-    queryFn: () =>
-      fetchJson<PipelineSummary>(`/api/platform/pipelines/${pipelineId}`),
+    queryFn: () => fetchJson<PipelineSummary>(`/api/platform/pipelines/${pipelineId}`),
   })
 
   const sourcesQuery = useQuery({
     queryKey: ["datasources"],
     queryFn: () => fetchJson<DataSource[]>("/api/platform/datasources"),
   })
+
   const telegramIntegrationsQuery = useQuery({
     queryKey: ["telegram-integrations"],
-    queryFn: () =>
-      fetchJson<TelegramIntegration[]>("/api/platform/integrations/telegram"),
+    queryFn: () => fetchJson<TelegramIntegration[]>("/api/platform/integrations/telegram"),
   })
 
   const pipeline = pipelineQuery.data
@@ -193,64 +183,29 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
         body: JSON.stringify(payload),
       }),
     onSuccess: async (updatedPipeline) => {
-      toast.success("Pipeline saved.")
       setNotice({ kind: "success", message: "Pipeline saved." })
       setName(updatedPipeline.name)
       setSavedName(updatedPipeline.name)
-      setSavedCanvasJson(
-        serializeCanvasDocument(parseCanvasJson(updatedPipeline.canvasJson))
-      )
+      setSavedCanvasJson(serializeCanvasDocument(parseCanvasJson(updatedPipeline.canvasJson)))
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["pipelines"] }),
         queryClient.invalidateQueries({ queryKey: ["pipeline", pipelineId] }),
       ])
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save pipeline."
-      )
-      setNotice({
-        kind: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to save pipeline.",
-      })
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to save pipeline." })
     },
   })
 
   const runMutation = useMutation({
-    mutationFn: () =>
-      fetchJson<unknown>(`/api/platform/pipelines/${pipelineId}/run`, {
-        method: "POST",
-      }),
+    mutationFn: () => fetchJson<unknown>(`/api/platform/pipelines/${pipelineId}/run`, { method: "POST" }),
     onSuccess: (payload) => {
       const rows = parsePipelineRunRows(payload)
       setOutputRows(rows)
-      toast.success(
-        rows.length > 0
-          ? `Pipeline ran with ${rows.length} rows.`
-          : "Pipeline ran with no rows."
-      )
-      setNotice({
-        kind: "success",
-        message:
-          rows.length > 0
-            ? `Pipeline ran with ${rows.length} rows.`
-            : "Pipeline ran with no rows.",
-      })
+      setNotice({ kind: "success", message: rows.length > 0 ? `Pipeline ran with ${rows.length} rows.` : "Pipeline ran with no rows." })
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? humanizePipelineRunError(error.message)
-          : "Failed to run pipeline."
-      )
-      setNotice({
-        kind: "error",
-        message:
-          error instanceof Error
-            ? humanizePipelineRunError(error.message)
-            : "Failed to run pipeline.",
-      })
+      setNotice({ kind: "error", message: error instanceof Error ? humanizePipelineRunError(error.message) : "Failed to run pipeline." })
     },
   })
 
@@ -259,44 +214,19 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
     [nodes, selectedNodeId]
   )
 
-  const nodeTypes = useMemo<NodeTypes>(
-    () => ({
-      pipelineNode: PipelineNode,
-    }),
-    []
-  )
-
-  const currentCanvasJson = useMemo(
-    () => serializeCanvasDocument({ nodes, edges }),
-    [edges, nodes]
-  )
+  const nodeTypes = useMemo<NodeTypes>(() => ({ pipelineNode: PipelineNode }), [])
+  const currentCanvasJson = useMemo(() => serializeCanvasDocument({ nodes, edges }), [edges, nodes])
   const trimmedName = name.trim() || "Untitled pipeline"
-  const hasUnsavedChanges =
-    currentCanvasJson !== savedCanvasJson || trimmedName !== (savedName || "Untitled pipeline")
+  const hasUnsavedChanges = currentCanvasJson !== savedCanvasJson || trimmedName !== (savedName || "Untitled pipeline")
   const savedAtLabel = formatSavedTimestamp(pipeline?.updatedAt)
 
-  useEffect(() => {
-    if (!hasUnsavedChanges || notice.kind !== "error") {
-      return
-    }
-
-    setNotice({ kind: "idle" })
-  }, [hasUnsavedChanges, notice.kind])
-
   function savePipeline() {
-    saveMutation.mutate({
-      name: trimmedName,
-      canvasJson: currentCanvasJson,
-    })
+    saveMutation.mutate({ name: trimmedName, canvasJson: currentCanvasJson })
   }
 
   function runPipeline() {
     if (hasUnsavedChanges) {
-      setNotice({
-        kind: "error",
-        message:
-          "Save changes before running. Run executes the last saved pipeline on the backend.",
-      })
+      setNotice({ kind: "error", message: `Save first. Run uses the backend version saved at ${savedAtLabel}.` })
       return
     }
 
@@ -306,10 +236,7 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
       (telegramIntegrationsQuery.data ?? []).map((integration) => integration.id)
     )
     if (issues.length > 0) {
-      setNotice({
-        kind: "error",
-        message: issues[0]?.message ?? "Resolve the pipeline validation issues before running.",
-      })
+      setNotice({ kind: "error", message: issues[0]?.message ?? "Resolve validation issues before running." })
       return
     }
 
@@ -319,12 +246,7 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
   if (pipelineQuery.isLoading || sourcesQuery.isLoading || telegramIntegrationsQuery.isLoading) {
     return (
       <main className="workspace-main">
-        <div className="section-panel mx-auto max-w-7xl">
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" />
-            Loading canvas...
-          </div>
-        </div>
+        <div className="panel px-4 py-6 text-sm text-secondary">Loading canvas...</div>
       </main>
     )
   }
@@ -332,118 +254,75 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
   if (pipelineQuery.isError || !pipeline) {
     return (
       <main className="workspace-main">
-        <div className="mx-auto max-w-7xl rounded-[2rem] border border-destructive/30 bg-destructive/10 p-8 text-sm text-destructive shadow-sm">
-          {pipelineQuery.error instanceof Error
-            ? pipelineQuery.error.message
-            : "Pipeline not found."}
-        </div>
+        <InlineBanner tone="error">
+          {pipelineQuery.error instanceof Error ? pipelineQuery.error.message : "Pipeline not found."}
+        </InlineBanner>
       </main>
     )
   }
 
   return (
-    <main className="workspace-main">
-      <div className="mx-auto max-w-[1500px] space-y-5">
-        <section className="page-shell">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="space-y-3">
-              <Link
-                href="/dashboard/pipelines"
-                className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
+    <main className="workspace-main space-y-5">
+      <PageHeader
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild type="button" variant="ghost">
+              <Link href="/dashboard/pipelines">
                 <ArrowLeft className="size-4" />
-                Back to pipelines
+                Back
               </Link>
-              <Input
-                className="h-11 text-lg font-semibold"
-                onChange={(event) => setName(event.target.value)}
-                value={name}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <div
-                className={cn(
-                  "inline-flex items-center rounded-full px-3 py-2 text-sm",
-                  hasUnsavedChanges
-                    ? "border border-amber-300 bg-amber-50 text-amber-950"
-                    : "border border-emerald-200 bg-emerald-50 text-emerald-950"
-                )}
-              >
-                {hasUnsavedChanges ? "Unsaved changes" : "Saved"}
-              </div>
-              {pipelineNodeOrder.map((kind) => {
-                const Icon = nodeIcons[kind]
-
-                return (
-                  <Button
-                    key={kind}
-                    onClick={() => addNode(kind)}
-                    type="button"
-                    variant="outline"
-                  >
-                    <Icon className="size-4" />
-                    {kind}
-                  </Button>
-                )
-              })}
-              <Button
-                onClick={runPipeline}
-                type="button"
-                variant="secondary"
-              >
-                {runMutation.isPending ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Play className="size-4" />
-                )}
-                Run
-              </Button>
-              <Button onClick={savePipeline} type="button">
-                {saveMutation.isPending ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                Save
-              </Button>
-            </div>
+            </Button>
+            <Button onClick={runPipeline} type="button" variant="outline">
+              {runMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
+              Run
+            </Button>
+            <Button onClick={savePipeline} type="button">
+              {saveMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
+              Save
+            </Button>
           </div>
+        }
+        description="Wire nodes on the canvas, save the graph state, and run only the last persisted version."
+        label="Canvas"
+        title={pipeline.name}
+      />
 
-          <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            Run executes the saved canvas, not unsaved changes on screen. Save after rewiring
-            nodes or editing source requests.
-          </p>
-
-          <div
-            className={cn(
-              "mt-4 rounded-[1.3rem] border px-4 py-3 text-sm leading-6",
-              hasUnsavedChanges
-                ? "border-amber-200 bg-amber-50 text-amber-950"
-                : "border-emerald-200 bg-emerald-50 text-emerald-950"
-            )}
-          >
-            {hasUnsavedChanges
-              ? `You have unsaved edits on screen. Run will use the last saved pipeline from ${savedAtLabel}.`
-              : `Screen matches the saved pipeline. Run will use the version saved at ${savedAtLabel}.`}
+      <section className="panel px-4 py-4">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+          <div className="grid gap-1.5">
+            <span className="field-label">Pipeline name</span>
+            <Input className="max-w-xl" onChange={(event) => setName(event.target.value)} value={name} />
           </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className={cn("rounded-full px-3 py-1.5", hasUnsavedChanges ? "bg-[color:color-mix(in_oklab,var(--warning)_12%,transparent)] text-foreground" : "bg-[color:color-mix(in_oklab,var(--success)_10%,transparent)] text-foreground")}>{hasUnsavedChanges ? "Unsaved changes" : "Saved"}</span>
+            <span className="mono-value text-secondary">Saved {savedAtLabel}</span>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+          {pipelineNodeOrder.map((kind) => {
+            const Icon = nodeIcons[kind]
+            return (
+              <Button key={kind} onClick={() => addNode(kind)} size="sm" type="button" variant="ghost">
+                <Icon className="size-4" />
+                {kind}
+              </Button>
+            )
+          })}
+        </div>
+      </section>
 
-          {notice.kind !== "idle" ? (
-            <div
-              className={cn(
-                "mt-4 rounded-[1.3rem] border px-4 py-3 text-sm",
-                notice.kind === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-                  : "border-destructive/30 bg-destructive/10 text-destructive"
-              )}
-            >
-              {notice.message}
-            </div>
-          ) : null}
-        </section>
+      {notice.kind !== "idle" ? (
+        <InlineBanner tone={notice.kind === "success" ? "success" : "error"}>
+          {notice.message}
+        </InlineBanner>
+      ) : null}
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="h-[76vh] overflow-hidden rounded-[2rem] border border-border/70 bg-background/95 shadow-sm">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="overflow-hidden rounded-[10px] border border-border bg-[color:oklch(0.17_0_0)] text-white">
+          <div className="border-b border-white/10 px-4 py-3 text-sm text-white/70">
+            Full-page canvas. Save before running to persist graph edits.
+          </div>
+          <div className="grid-dots h-[76vh]">
             <ReactFlow
               edges={edges}
               fitView
@@ -455,20 +334,20 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
               onNodesChange={onNodesChange}
               onPaneClick={() => selectNode(null)}
             >
-              <MiniMap />
-              <Controls />
-              <Background gap={20} size={1.2} />
+              <MiniMap className="!bg-black/40" />
+              <Controls className="!bg-black/50" />
+              <Background color="rgba(255,255,255,0.12)" gap={18} size={1.3} variant={BackgroundVariant.Dots} />
             </ReactFlow>
           </div>
+        </div>
 
-          <PipelineConfigDrawer
-            edges={edges}
-            node={selectedNode}
-            sources={sourcesQuery.data ?? []}
-            telegramIntegrations={telegramIntegrationsQuery.data ?? []}
-          />
-        </section>
-      </div>
+        <PipelineConfigDrawer
+          edges={edges}
+          node={selectedNode}
+          sources={sourcesQuery.data ?? []}
+          telegramIntegrations={telegramIntegrationsQuery.data ?? []}
+        />
+      </section>
     </main>
   )
 }

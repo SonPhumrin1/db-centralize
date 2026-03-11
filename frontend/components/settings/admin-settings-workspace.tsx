@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 
+import { PageHeader } from "@/components/dashboard/platform-ui"
 import { SystemSettingsWorkspace } from "@/components/settings/system-settings-workspace"
 import { UserManagementWorkspace } from "@/components/settings/user-management-workspace"
 
@@ -15,15 +16,12 @@ export function AdminSettingsWorkspace({
   const [platformName, setPlatformName] = useState(initialPlatformName)
 
   return (
-    <div className="space-y-6">
-      <section className="page-shell">
-        <p className="page-kicker">Settings</p>
-        <h1 className="section-title mt-3">{platformName}</h1>
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground">
-          Manage dashboard access, platform defaults, and the root bootstrap
-          credential from one admin workspace.
-        </p>
-      </section>
+    <div className="space-y-5">
+      <PageHeader
+        description="Control platform defaults, rotate bootstrap credentials with an explicit confirmation step, and manage operator accounts inline."
+        label="Admin"
+        title={platformName}
+      />
 
       <SystemSettingsWorkspace onPlatformNameChange={setPlatformName} />
       <UserManagementWorkspace currentUserId={currentUserId} />

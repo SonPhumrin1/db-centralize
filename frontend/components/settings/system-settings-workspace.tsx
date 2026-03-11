@@ -1,10 +1,9 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { KeyRound, LoaderCircle, Settings2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 
+import { InlineBanner } from "@/components/dashboard/platform-ui"
 import { fetchJson } from "@/components/settings/fetch-json"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,16 +23,15 @@ const initialPasswordState: ChangeRootPasswordInput = {
   confirmNewPassword: "",
 }
 
-export function SystemSettingsWorkspace({
-  onPlatformNameChange,
-}: SystemSettingsWorkspaceProps) {
+export function SystemSettingsWorkspace({ onPlatformNameChange }: SystemSettingsWorkspaceProps) {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<UpdateSystemSettingsInput>({
     platformName: "",
     defaultPageSize: 25,
   })
-  const [passwordForm, setPasswordForm] =
-    useState<ChangeRootPasswordInput>(initialPasswordState)
+  const [passwordForm, setPasswordForm] = useState<ChangeRootPasswordInput>(initialPasswordState)
+  const [showRotateForm, setShowRotateForm] = useState(false)
+  const [notice, setNotice] = useState<{ kind: "idle" | "success" | "error"; message?: string }>({ kind: "idle" })
 
   const settingsQuery = useQuery({
     queryKey: ["system-settings"],
@@ -59,14 +57,12 @@ export function SystemSettingsWorkspace({
         body: JSON.stringify(payload),
       }),
     onSuccess: async (settings) => {
-      toast.success("System settings updated.")
+      setNotice({ kind: "success", message: "System settings updated." })
       onPlatformNameChange?.(settings.platformName)
       await queryClient.invalidateQueries({ queryKey: ["system-settings"] })
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update settings."
-      )
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to update settings." })
     },
   })
 
@@ -78,14 +74,11 @@ export function SystemSettingsWorkspace({
       }),
     onSuccess: () => {
       setPasswordForm(initialPasswordState)
-      toast.success("Root password updated.")
+      setShowRotateForm(false)
+      setNotice({ kind: "success", message: "Root password updated." })
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to update root password."
-      )
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to update root password." })
     },
   })
 
@@ -93,180 +86,136 @@ export function SystemSettingsWorkspace({
     key: K,
     value: UpdateSystemSettingsInput[K]
   ) {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-    }))
+    setForm((current) => ({ ...current, [key]: value }))
   }
 
   function updatePasswordForm<K extends keyof ChangeRootPasswordInput>(
     key: K,
     value: ChangeRootPasswordInput[K]
   ) {
-    setPasswordForm((current) => ({
-      ...current,
-      [key]: value,
-    }))
-  }
-
-  function submitSettings() {
-    updateMutation.mutate({
-      platformName: form.platformName.trim(),
-      defaultPageSize: Number(form.defaultPageSize),
-    })
-  }
-
-  function submitRootPassword() {
-    passwordMutation.mutate(passwordForm)
+    setPasswordForm((current) => ({ ...current, [key]: value }))
   }
 
   return (
-    <section className="grid gap-5 xl:grid-cols-2">
-      <article className="rounded-[1.8rem] border border-border/70 bg-background/92 p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="rounded-full bg-sky-100 p-3 text-sky-800">
-            <Settings2 className="size-5" />
-          </span>
-          <div>
-            <h2 className="text-xl font-semibold">System settings</h2>
-            <p className="text-sm text-muted-foreground">
-              Control platform branding and the default table page size.
-            </p>
-          </div>
+    <section className="panel overflow-hidden">
+      <div className="panel-header">
+        <div>
+          <p className="page-label">System Settings</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Platform defaults</h2>
         </div>
+      </div>
 
-        {settingsQuery.isLoading ? (
-          <div className="mt-6 space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-36" />
-          </div>
-        ) : settingsQuery.isError ? (
-          <div className="mt-6 rounded-[1.4rem] border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm text-destructive">
-            {settingsQuery.error instanceof Error
-              ? settingsQuery.error.message
-              : "Failed to load system settings."}
-          </div>
-        ) : (
-          <div className="mt-5 grid gap-4">
-            <Field label="Platform name">
+      {notice.kind !== "idle" && notice.message ? (
+        <div className="border-b border-border px-4 py-3">
+          <InlineBanner tone={notice.kind === "success" ? "success" : "error"}>
+            {notice.message}
+          </InlineBanner>
+        </div>
+      ) : null}
+
+      {settingsQuery.isLoading ? (
+        <div className="space-y-3 px-4 py-4">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ) : settingsQuery.isError ? (
+        <div className="px-4 py-4 text-sm text-[color:var(--danger)]">
+          {settingsQuery.error instanceof Error ? settingsQuery.error.message : "Failed to load system settings."}
+        </div>
+      ) : (
+        <div className="divide-y divide-border">
+          <SettingRow
+            control={
               <Input
-                onChange={(event) =>
-                  updateForm("platformName", event.target.value)
-                }
-                placeholder="Data Platform"
+                onChange={(event) => updateForm("platformName", event.target.value)}
                 value={form.platformName}
               />
-            </Field>
-            <Field label="Default pagination size">
-              <Input
-                min={5}
-                max={200}
-                onChange={(event) =>
-                  updateForm(
-                    "defaultPageSize",
-                    Number.parseInt(event.target.value || "0", 10)
-                  )
-                }
-                type="number"
+            }
+            description="Shown in the dashboard shell and admin header."
+            label="Platform name"
+          />
+          <SettingRow
+            control={
+              <select
+                className="field-select w-full max-w-[160px]"
+                onChange={(event) => updateForm("defaultPageSize", Number(event.target.value))}
                 value={form.defaultPageSize}
-              />
-            </Field>
-
-            <p className="text-xs tracking-[0.16em] text-muted-foreground uppercase">
-              Last updated{" "}
-              {settingsQuery.data?.updatedAt
-                ? new Date(settingsQuery.data.updatedAt).toLocaleString()
-                : "just now"}
-            </p>
-
+              >
+                {[25, 50, 100, 500].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            }
+            description="Used as the default raw data page size across results tables."
+            label="Default page size"
+          />
+          <SettingRow
+            control={
+              <div className="w-full max-w-md space-y-3">
+                <Button onClick={() => setShowRotateForm((current) => !current)} type="button" variant="outline">
+                  {showRotateForm ? "Cancel rotation" : "Rotate password"}
+                </Button>
+                {showRotateForm ? (
+                  <div className="space-y-3 rounded-[8px] border border-border px-3 py-3">
+                    <Input
+                      onChange={(event) => updatePasswordForm("newPassword", event.target.value)}
+                      placeholder="New root password"
+                      type="password"
+                      value={passwordForm.newPassword}
+                    />
+                    <Input
+                      onChange={(event) => updatePasswordForm("confirmNewPassword", event.target.value)}
+                      placeholder="Confirm new password"
+                      type="password"
+                      value={passwordForm.confirmNewPassword}
+                    />
+                    <Button onClick={() => passwordMutation.mutate(passwordForm)} type="button">
+                      {passwordMutation.isPending ? "Rotating..." : "Confirm rotation"}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            }
+            description={`Bootstrap admin: ${settingsQuery.data?.rootUsername ?? "root"}. Rotation is never applied instantly without a second explicit action.`}
+            label="Root password"
+          />
+          <div className="flex justify-end px-4 py-4">
             <Button
-              className="mt-2"
               disabled={updateMutation.isPending}
-              onClick={submitSettings}
+              onClick={() =>
+                updateMutation.mutate({
+                  platformName: form.platformName.trim(),
+                  defaultPageSize: Number(form.defaultPageSize),
+                })
+              }
               type="button"
             >
-              {updateMutation.isPending ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <Settings2 className="size-4" />
-              )}
-              Save settings
+              {updateMutation.isPending ? "Saving..." : "Save settings"}
             </Button>
           </div>
-        )}
-      </article>
-
-      <article className="rounded-[1.8rem] border border-border/70 bg-background/92 p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="rounded-full bg-rose-100 p-3 text-rose-800">
-            <KeyRound className="size-5" />
-          </span>
-          <div>
-            <h2 className="text-xl font-semibold">Root password</h2>
-            <p className="text-sm text-muted-foreground">
-              Reset the bootstrap administrator credential for{" "}
-              <span className="font-medium text-foreground">
-                {settingsQuery.data?.rootUsername ?? "root"}
-              </span>
-              .
-            </p>
-          </div>
         </div>
-
-        <div className="mt-5 grid gap-4">
-          <Field label="New password">
-            <Input
-              onChange={(event) =>
-                updatePasswordForm("newPassword", event.target.value)
-              }
-              placeholder="Replace the bootstrap password"
-              type="password"
-              value={passwordForm.newPassword}
-            />
-          </Field>
-          <Field label="Confirm new password">
-            <Input
-              onChange={(event) =>
-                updatePasswordForm("confirmNewPassword", event.target.value)
-              }
-              placeholder="Repeat the new password"
-              type="password"
-              value={passwordForm.confirmNewPassword}
-            />
-          </Field>
-
-          <Button
-            className="mt-2"
-            disabled={passwordMutation.isPending}
-            onClick={submitRootPassword}
-            type="button"
-            variant="outline"
-          >
-            {passwordMutation.isPending ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <KeyRound className="size-4" />
-            )}
-            Update root password
-          </Button>
-        </div>
-      </article>
+      )}
     </section>
   )
 }
 
-function Field({
-  children,
+function SettingRow({
   label,
+  description,
+  control,
 }: {
-  children: React.ReactNode
   label: string
+  description: string
+  control: React.ReactNode
 }) {
   return (
-    <label className="space-y-2 text-sm font-medium text-foreground">
-      <span>{label}</span>
-      {children}
-    </label>
+    <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(240px,0.48fr)_minmax(0,0.52fr)] lg:items-start">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        <p className="mt-1 text-sm text-secondary">{description}</p>
+      </div>
+      <div>{control}</div>
+    </div>
   )
 }

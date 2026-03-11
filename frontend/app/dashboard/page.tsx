@@ -1,6 +1,8 @@
 import Link from "next/link"
+
+import { PageHeader, InlineBanner, StatusBadge, TypeTag } from "@/components/dashboard/platform-ui"
 import { Button } from "@/components/ui/button"
-import type { DataSource, SchemaResult } from "@/lib/datasources"
+import type { DataSource } from "@/lib/datasources"
 import type { Endpoint } from "@/lib/endpoints"
 import { backendFetch } from "@/lib/platform-server"
 import type { PipelineSummary } from "@/lib/pipelines"
@@ -11,34 +13,13 @@ type DashboardData = {
   queries: SavedQuery[]
   endpoints: Endpoint[]
   pipelines: PipelineSummary[]
-  schemas: Record<number, SchemaResult>
   failures: string[]
 }
 
-async function loadSchemas(sources: DataSource[]) {
-  const databaseSources = sources.filter((source) => source.type !== "rest")
-  const schemaResults = await Promise.allSettled(
-    databaseSources.map(async (source) => ({
-      sourceId: source.id,
-      schema: await backendFetch<SchemaResult>(
-        `/api/v1/datasources/${source.id}/schema`
-      ),
-    }))
-  )
-
-  const schemas: Record<number, SchemaResult> = {}
-  const failures: string[] = []
-
-  for (const result of schemaResults) {
-    if (result.status === "fulfilled") {
-      schemas[result.value.sourceId] = result.value.schema
-      continue
-    }
-
-    failures.push("source schema")
-  }
-
-  return { failures, schemas }
+type ActivityItem = {
+  at: string
+  label: string
+  detail: string
 }
 
 async function loadDashboardData(): Promise<DashboardData> {
@@ -57,311 +38,292 @@ async function loadDashboardData(): Promise<DashboardData> {
     pipelinesResult.status === "rejected" ? "pipelines" : null,
   ].filter((value): value is string => value !== null)
 
-  const sources =
-    sourcesResult.status === "fulfilled" ? sourcesResult.value : []
-  const { failures: schemaFailures, schemas } = await loadSchemas(sources)
-
   return {
-    sources,
+    sources: sourcesResult.status === "fulfilled" ? sourcesResult.value : [],
     queries: queriesResult.status === "fulfilled" ? queriesResult.value : [],
     endpoints:
       endpointsResult.status === "fulfilled" ? endpointsResult.value : [],
     pipelines:
       pipelinesResult.status === "fulfilled" ? pipelinesResult.value : [],
-    schemas,
-    failures: [...failures, ...schemaFailures],
+    failures,
   }
 }
 
-function formatTimestamp(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : "Never"
+function formatTime(value?: string | null) {
+  if (!value) {
+    return "--"
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value))
+}
+
+function buildActivityFeed(data: DashboardData) {
+  const items: ActivityItem[] = []
+
+  for (const source of data.sources) {
+    items.push({
+      at: source.lastTestedAt ?? source.createdAt,
+      label: "Source",
+      detail: `${source.name} ${source.status === "connected" ? "validated" : "needs review"}`,
+    })
+  }
+
+  for (const query of data.queries) {
+    items.push({
+      at: query.updatedAt,
+      label: "Query",
+      detail: `${query.name} updated`,
+    })
+  }
+
+  for (const endpoint of data.endpoints) {
+    items.push({
+      at: endpoint.createdAt,
+      label: "Endpoint",
+      detail: `${endpoint.slug} ${endpoint.isActive ? "active" : "draft"}`,
+    })
+  }
+
+  for (const pipeline of data.pipelines) {
+    items.push({
+      at: pipeline.lastRanAt ?? pipeline.updatedAt,
+      label: "Pipeline",
+      detail: `${pipeline.name} ${pipeline.lastRunStatus ?? "saved"}`,
+    })
+  }
+
+  return items
+    .filter((item) => item.at)
+    .sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime())
+    .slice(0, 8)
 }
 
 export default async function DashboardPage() {
-  const { endpoints, failures, pipelines, queries, schemas, sources } =
-    await loadDashboardData()
-  const connectedSources = sources.filter(
-    (source) => source.status === "connected"
-  )
-  const activeEndpoints = endpoints.filter((endpoint) => endpoint.isActive)
-  const pipelinesWithRuns = pipelines.filter((pipeline) => pipeline.lastRanAt)
-  const summary = [
+  const data = await loadDashboardData()
+  const connectedSources = data.sources.filter((source) => source.status === "connected")
+  const activeEndpoints = data.endpoints.filter((endpoint) => endpoint.isActive)
+  const pipelineRuns = data.pipelines.filter((pipeline) => pipeline.lastRanAt)
+  const activityFeed = buildActivityFeed(data)
+  const stats = [
     {
       label: "Sources",
-      value: sources.length,
-      hint: `${connectedSources.length} connected and ready to query`,
-      href: "/dashboard/sources",
+      value: data.sources.length,
+      hint: `${connectedSources.length} connected`,
     },
     {
       label: "Queries",
-      value: queries.length,
-      hint: "Reusable query drafts under access control",
-      href: "/dashboard/queries",
+      value: data.queries.length,
+      hint: "Saved drafts and runnable SQL",
     },
     {
-      label: "Active endpoints",
+      label: "Active Endpoints",
       value: activeEndpoints.length,
-      hint: `${endpoints.length} total routes with staged publication`,
-      href: "/dashboard/endpoints",
+      hint: `${data.endpoints.length} total routes`,
     },
     {
-      label: "Pipelines",
-      value: pipelines.length,
-      hint: `${pipelinesWithRuns.length} with a recorded run history`,
-      href: "/dashboard/pipelines",
-    },
-  ]
-  const recentRuns = pipelines
-    .filter((pipeline) => pipeline.lastRanAt && pipeline.lastRunStatus)
-    .sort((left, right) => {
-      const leftTime = new Date(left.lastRanAt ?? 0).getTime()
-      const rightTime = new Date(right.lastRanAt ?? 0).getTime()
-      return rightTime - leftTime
-    })
-    .slice(0, 6)
-  const highlights = [
-    {
-      label: "Connected sources",
-      value: connectedSources.length,
-      copy: "Validated connections feeding the platform right now.",
-    },
-    {
-      label: "Published routes",
-      value: activeEndpoints.length,
-      copy: "Active invoke endpoints currently exposed to callers.",
-    },
-    {
-      label: "Live pipelines",
-      value: pipelinesWithRuns.length,
-      copy: "Pipelines with at least one completed execution record.",
+      label: "Pipeline Runs",
+      value: pipelineRuns.length,
+      hint: `${data.pipelines.length} pipeline definitions`,
     },
   ]
 
   return (
-    <main className="workspace-main">
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <div className="page-shell">
-          <p className="page-kicker">Dashboard / overview</p>
-          <h1 className="page-title mt-6 max-w-5xl">
-            One desk for your sources, query drafts, published routes, and flow
-            runs.
-          </h1>
-          <p className="page-copy mt-6">
-            Monitor the health of connected systems, move between authoring and
-            publication, and keep execution history visible without falling back
-            to a pile of interchangeable cards.
-          </p>
+    <main className="workspace-main space-y-5">
+      <PageHeader
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/sources">New Source</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/queries">New Query</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard/endpoints">View Endpoints</Link>
+            </Button>
+          </>
+        }
+        description="Monitor connected systems, watch publishing status, and move between authoring surfaces without leaving the operator loop."
+        label="Overview"
+        title="Dashboard"
+      />
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link href="/dashboard/sources">Connect or test sources</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/dashboard/queries">Write queries</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/dashboard/pipelines">Open pipelines</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/dashboard/integrations">Manage Telegram</Link>
-            </Button>
-          </div>
+      {data.failures.length > 0 ? (
+        <InlineBanner tone="warning">
+          Some dashboard sections could not be loaded: {data.failures.join(", ")}.
+        </InlineBanner>
+      ) : null}
 
-          {failures.length > 0 ? (
-            <div className="mt-6 rounded-[1.4rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              Some dashboard sections could not be loaded: {failures.join(", ")}
-              .
+      <section className="panel overflow-hidden">
+        <div className="stat-strip">
+          {stats.map((stat) => (
+            <div key={stat.label} className="stat-cell">
+              <p className="page-label">{stat.label}</p>
+              <p className="mt-2 text-[2rem] font-semibold tracking-[-0.06em]">{stat.value}</p>
+              <p className="mt-1 text-sm text-secondary">{stat.hint}</p>
             </div>
-          ) : null}
+          ))}
         </div>
-
-        <aside className="section-panel-muted">
-          <p className="page-kicker">Current signal</p>
-          <div className="mt-6 space-y-6">
-            {highlights.map((item) => (
-              <div key={item.label}>
-                <p className="text-sm text-muted-foreground">{item.label}</p>
-                <p className="mt-1 font-display text-5xl leading-none tracking-[-0.06em]">
-                  {item.value}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {item.copy}
-                </p>
-              </div>
-            ))}
-          </div>
-        </aside>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        {summary.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className="section-panel group transition-transform duration-200 hover:-translate-y-1"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="page-kicker">{item.label}</p>
-                <p className="mt-4 font-display text-5xl leading-none tracking-[-0.06em]">
-                  {item.value}
-                </p>
-              </div>
-              <span className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-                Open
-              </span>
-            </div>
-            <p className="mt-6 border-t border-border/70 pt-4 text-sm leading-7 text-muted-foreground">
-              {item.hint}
-            </p>
-          </Link>
-        ))}
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <div className="section-panel">
-          <div className="flex items-center justify-between gap-4">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="panel">
+          <div className="panel-header">
             <div>
-              <p className="page-kicker">Sources</p>
-              <h2 className="section-title mt-3">Connection ledger</h2>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                Verification status, schema availability, and latest activity
-                for the systems feeding this workspace.
-              </p>
+              <p className="page-label">Activity</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Recent events</h2>
             </div>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/sources">View all</Link>
-            </Button>
+            <p className="mono-value text-secondary">{activityFeed.length} entries</p>
           </div>
-
-          {sources.length > 0 ? (
-            <div className="mt-6">
-              {sources.slice(0, 6).map((source) => (
-                <article
-                  key={source.id}
-                  className="grid gap-3 border-t border-border/70 py-4 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]"
-                >
-                  <div className="space-y-3">
-                    <div>
-                      <Link
-                        href={`/dashboard/sources/${source.id}`}
-                        className="text-lg font-semibold tracking-[-0.03em] transition-colors hover:text-primary"
-                      >
-                        {source.name}
-                      </Link>
-                      <p className="mt-1 text-sm text-muted-foreground capitalize">
-                        {source.type}
-                      </p>
+          <div className="panel-body p-0">
+            {activityFeed.length === 0 ? (
+              <div className="px-4 py-10 text-center text-sm text-secondary">
+                No recent activity yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {activityFeed.map((item) => (
+                  <div key={`${item.at}-${item.detail}`} className="grid gap-2 px-4 py-3 md:grid-cols-[112px_minmax(0,1fr)] md:items-center">
+                    <span className="mono-value text-secondary">{formatTime(item.at)}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TypeTag>{item.label}</TypeTag>
+                      <span className="text-sm">{item.detail}</span>
                     </div>
-                    {source.type === "rest" ? (
-                      <p className="text-sm leading-7 text-muted-foreground">
-                        {source.summary.baseUrl ?? "Base URL missing"}
-                      </p>
-                    ) : (
-                      <div className="space-y-3 text-sm leading-7 text-muted-foreground">
-                        <p>
-                          {source.summary.host}:{source.summary.port} /{" "}
-                          {source.summary.database}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {(schemas[source.id]?.tables ?? [])
-                            .slice(0, 4)
-                            .map((table) => (
-                              <span
-                                key={table}
-                                className="rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-foreground"
-                              >
-                                {table}
-                              </span>
-                            ))}
-                          {(schemas[source.id]?.tables?.length ?? 0) === 0 ? (
-                            <span className="text-xs">
-                              No schema cached yet
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    )}
                   </div>
-
-                  <div className="flex flex-col gap-3 lg:items-end">
-                    <span
-                      className={`status-pill ${
-                        source.status === "connected"
-                          ? "bg-emerald-100 text-emerald-950"
-                          : "bg-rose-100 text-rose-950"
-                      }`}
-                    >
-                      {source.status}
-                    </span>
-                    <p className="text-sm text-muted-foreground">
-                      Last queried: {formatTimestamp(source.lastQueriedAt)}
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-[1.4rem] border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-sm leading-7 text-muted-foreground">
-              No sources yet. Add a PostgreSQL, MySQL, or REST source to start
-              querying external systems.
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="section-panel">
-          <div className="flex items-center justify-between gap-4">
+        <div className="panel">
+          <div className="panel-header">
             <div>
-              <p className="page-kicker">Pipelines</p>
-              <h2 className="section-title mt-3">Recent execution notes</h2>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                Latest pipeline runs with status and execution timestamp.
-              </p>
+              <p className="page-label">Quick links</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Operator paths</h2>
             </div>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/pipelines">View pipelines</Link>
+          </div>
+          <div className="panel-body space-y-3">
+            <Link className="flex items-center justify-between rounded-[8px] border border-border px-3 py-3 text-sm hover:bg-surface-raised" href="/dashboard/sources">
+              <span>New Source</span>
+              <span className="text-secondary">Connections and schema</span>
+            </Link>
+            <Link className="flex items-center justify-between rounded-[8px] border border-border px-3 py-3 text-sm hover:bg-surface-raised" href="/dashboard/queries">
+              <span>New Query</span>
+              <span className="text-secondary">Editor and results grid</span>
+            </Link>
+            <Link className="flex items-center justify-between rounded-[8px] border border-border px-3 py-3 text-sm hover:bg-surface-raised" href="/dashboard/endpoints">
+              <span>View Endpoints</span>
+              <span className="text-secondary">Auth and publish state</span>
+            </Link>
+            <Link className="flex items-center justify-between rounded-[8px] border border-border px-3 py-3 text-sm hover:bg-surface-raised" href="/dashboard/pipelines">
+              <span>Open Pipelines</span>
+              <span className="text-secondary">Canvas and run history</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <div className="panel overflow-hidden">
+          <div className="panel-header">
+            <div>
+              <p className="page-label">Sources</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Connection status</h2>
+            </div>
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/dashboard/sources">Open</Link>
             </Button>
           </div>
-
-          {recentRuns.length > 0 ? (
-            <div className="mt-5 overflow-hidden rounded-[1.4rem] border border-border/70">
-              <table className="min-w-full divide-y divide-border/70 text-sm">
-                <thead className="bg-stone-100/80 text-left text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Pipeline</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Ran at</th>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Last Test</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.sources.slice(0, 5).map((source) => (
+                  <tr key={source.id} className="data-row">
+                    <td className="font-medium">{source.name}</td>
+                    <td><TypeTag>{source.type}</TypeTag></td>
+                    <td>
+                      <StatusBadge
+                        label={source.status === "connected" ? "Active" : "Warning"}
+                        tone={source.status === "connected" ? "success" : "warning"}
+                      />
+                    </td>
+                    <td className="mono-value text-secondary">{formatTime(source.lastTestedAt)}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border/70 bg-background">
-                  {recentRuns.map((pipeline) => (
-                    <tr key={pipeline.id}>
-                      <td className="px-4 py-3 font-medium">{pipeline.name}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                            pipeline.lastRunStatus === "success"
-                              ? "bg-emerald-100 text-emerald-900"
-                              : "bg-rose-100 text-rose-900"
-                          }`}
-                        >
-                          {pipeline.lastRunStatus}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {formatTimestamp(pipeline.lastRanAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+                {data.sources.length === 0 ? (
+                  <tr>
+                    <td className="py-10 text-center text-sm text-secondary" colSpan={4}>
+                      No sources connected.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="panel overflow-hidden">
+          <div className="panel-header">
+            <div>
+              <p className="page-label">Pipelines</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Execution state</h2>
             </div>
-          ) : (
-            <div className="mt-6 rounded-[1.4rem] border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-sm leading-7 text-muted-foreground">
-              No pipeline runs yet. Build a flow and run it to see execution
-              history here.
-            </div>
-          )}
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/dashboard/pipelines">Open</Link>
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Last Run</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.pipelines.slice(0, 6).map((pipeline) => (
+                  <tr key={pipeline.id} className="data-row">
+                    <td className="font-medium">{pipeline.name}</td>
+                    <td>
+                      <StatusBadge
+                        label={pipeline.lastRunStatus ?? "Draft"}
+                        tone={
+                          pipeline.lastRunStatus === "success"
+                            ? "success"
+                            : pipeline.lastRunStatus === "failed"
+                              ? "error"
+                              : "muted"
+                        }
+                      />
+                    </td>
+                    <td className="mono-value text-secondary">{formatTime(pipeline.lastRanAt ?? pipeline.updatedAt)}</td>
+                  </tr>
+                ))}
+                {data.pipelines.length === 0 ? (
+                  <tr>
+                    <td className="py-10 text-center text-sm text-secondary" colSpan={3}>
+                      No pipelines created.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>

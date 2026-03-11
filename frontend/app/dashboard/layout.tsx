@@ -1,8 +1,9 @@
-import { ShieldCheck } from "lucide-react"
+import { LogOut, ShieldCheck } from "lucide-react"
 import { redirect } from "next/navigation"
 
 import { signOut } from "@/app/(auth)/login/actions"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { ThemeToggle } from "@/components/dashboard/theme-toggle"
 import { Button } from "@/components/ui/button"
 import {
   getBackendMe,
@@ -28,84 +29,71 @@ export default async function DashboardLayout({
     backendMe?.username ??
     session.user.username ??
     session.user.email ??
-    "dashboard-user"
+    "operator"
   const role = backendMe?.role ?? "member"
   const isAdmin = isAdminRole(role)
-  const platformName = settings?.platformName ?? "Data Platform"
+  const platformName = settings?.platformName ?? "DataPlatform"
 
   return (
-    <div className="min-h-svh">
-      <div className="mx-auto max-w-[1600px] px-4 py-4 md:px-6 md:py-6">
-        <div className="page-shell mb-4 md:hidden">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="page-kicker">{platformName}</p>
-              <p className="mt-3 text-lg font-medium">{username}</p>
-              <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">
-                {platformName} · {role}
-              </p>
-            </div>
-            <form action={signOut}>
-              <Button size="sm" type="submit" variant="outline">
-                Sign out
-              </Button>
-            </form>
-          </div>
-          <div className="mt-4">
-            <DashboardNav isAdmin={isAdmin} orientation="horizontal" />
-          </div>
+    <div className="app-shell md:grid md:grid-cols-[220px_minmax(0,1fr)]">
+      <aside className="sidebar-shell hidden md:flex">
+        <div className="px-4 py-5">
+          <p className="font-mono text-[11px] tracking-[0.14em] text-secondary uppercase">
+            {platformName}
+          </p>
+          <h1 className="mt-3 text-[1.35rem] font-semibold tracking-[-0.04em]">
+            DataPlatform
+          </h1>
+          <p className="mt-2 text-sm text-secondary">Internal data control surface</p>
         </div>
 
-        <div className="flex gap-8">
-          <aside className="sticky top-6 hidden h-[calc(100svh-3rem)] w-[21rem] shrink-0 flex-col overflow-hidden rounded-[2.2rem] border border-border/70 bg-background/78 p-6 shadow-[0_30px_80px_-46px_oklch(0.24_0.03_40/0.4)] backdrop-blur md:flex">
-            <div>
-              <p className="page-kicker">{platformName}</p>
-              <div className="editorial-rule mt-4" />
-              <h1 className="mt-6 font-display text-4xl leading-none tracking-[-0.05em]">
-                Control room
-              </h1>
-              <p className="mt-4 text-sm leading-7 text-muted-foreground">
-                Sources, queries, routes, Telegram bots, and pipelines arranged
-                as one operator workspace.
-              </p>
-            </div>
+        <div className="flex-1 px-2">
+          <DashboardNav isAdmin={isAdmin} />
+        </div>
 
-            <div className="mt-8 flex-1">
-              <DashboardNav isAdmin={isAdmin} />
-            </div>
-
-            <div className="editorial-rule" />
-            <div className="mt-6">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="page-kicker">Signed in</p>
-                  <p className="mt-3 truncate text-lg font-medium">
-                    {username}
-                  </p>
-                  <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
-                    {role}
-                  </p>
-                </div>
-                <span className="status-pill bg-emerald-100 text-emerald-950">
-                  <ShieldCheck className="mr-1 size-3.5" />
-                  Protected
-                </span>
+        <div className="border-t border-border px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{username}</p>
+              <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-secondary">
+                <ShieldCheck className="size-3.5" />
+                <span>{role}</span>
               </div>
-              <form action={signOut} className="mt-4">
-                <Button
-                  className="w-full justify-between"
-                  type="submit"
-                  variant="outline"
-                >
-                  Sign out
-                  <ShieldCheck className="size-4" />
+            </div>
+            <ThemeToggle />
+          </div>
+          <form action={signOut} className="mt-3">
+            <Button className="w-full justify-between" type="submit" variant="ghost">
+              Sign out
+              <LogOut className="size-4" />
+            </Button>
+          </form>
+        </div>
+      </aside>
+
+      <div className="content-shell min-w-0">
+        <div className="border-b border-border px-4 py-3 md:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-secondary">
+                {platformName}
+              </p>
+              <p className="text-sm font-medium">{username}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <form action={signOut}>
+                <Button size="icon-sm" type="submit" variant="ghost">
+                  <LogOut className="size-4" />
                 </Button>
               </form>
             </div>
-          </aside>
-
-          <div className="min-w-0 flex-1 pb-6">{children}</div>
+          </div>
+          <div className="mt-3">
+            <DashboardNav isAdmin={isAdmin} orientation="horizontal" />
+          </div>
         </div>
+        {children}
       </div>
     </div>
   )

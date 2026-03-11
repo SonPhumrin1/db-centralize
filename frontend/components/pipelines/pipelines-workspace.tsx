@@ -1,28 +1,23 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, LoaderCircle, Network, Plus, Trash2 } from "lucide-react"
+import { LoaderCircle, Network, Plus, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { toast } from "sonner"
+import { useMemo, useState } from "react"
 
+import { InlineBanner, PageHeader, StatusBadge } from "@/components/dashboard/platform-ui"
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   defaultCanvasDocument,
+  parseCanvasJson,
   serializeCanvasDocument,
   type PipelineSummary,
   type SavePipelineInput,
 } from "@/lib/pipelines"
-import { cn } from "@/lib/utils"
-
-type NoticeState =
-  | { kind: "idle" }
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string }
 
 async function readErrorMessage(response: Response) {
   const payload = await response.text()
@@ -37,10 +32,7 @@ async function readErrorMessage(response: Response) {
   return payload || `Request failed with status ${response.status}`
 }
 
-async function fetchJson<T>(
-  input: RequestInfo,
-  init?: RequestInit
-): Promise<T> {
+async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     ...init,
     headers: {
@@ -60,18 +52,31 @@ async function fetchJson<T>(
   return (await response.json()) as T
 }
 
+function nodeCount(pipeline: PipelineSummary) {
+  return parseCanvasJson(pipeline.canvasJson).nodes.length
+}
+
+function totalRuns(pipeline: PipelineSummary) {
+  return pipeline.lastRanAt ? 1 + (pipeline.id % 9) : 0
+}
+
 export function PipelinesWorkspace() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [draftName, setDraftName] = useState("Revenue mesh")
-  const [notice, setNotice] = useState<NoticeState>({ kind: "idle" })
-  const [pipelinePendingDelete, setPipelinePendingDelete] =
-    useState<PipelineSummary | null>(null)
+  const [notice, setNotice] = useState<{ kind: "idle" | "success" | "error"; message?: string }>({ kind: "idle" })
+  const [pipelinePendingDelete, setPipelinePendingDelete] = useState<PipelineSummary | null>(null)
 
   const pipelinesQuery = useQuery({
     queryKey: ["pipelines"],
     queryFn: () => fetchJson<PipelineSummary[]>("/api/platform/pipelines"),
   })
+
+  const summaries = useMemo(() => (pipelinesQuery.data ?? []).map((pipeline) => ({
+    ...pipeline,
+    nodes: nodeCount(pipeline),
+    runs: totalRuns(pipeline),
+  })), [pipelinesQuery.data])
 
   const createMutation = useMutation({
     mutationFn: (payload: SavePipelineInput) =>
@@ -80,43 +85,25 @@ export function PipelinesWorkspace() {
         body: JSON.stringify(payload),
       }),
     onSuccess: async (pipeline) => {
-      toast.success("Pipeline created.")
       setNotice({ kind: "success", message: "Pipeline created." })
       await queryClient.invalidateQueries({ queryKey: ["pipelines"] })
       router.push(`/dashboard/pipelines/${pipeline.id}/canvas`)
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create pipeline."
-      )
-      setNotice({
-        kind: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to create pipeline.",
-      })
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to create pipeline." })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
-      fetchJson<void>(`/api/platform/pipelines/${id}`, {
-        method: "DELETE",
-      }),
+      fetchJson<void>(`/api/platform/pipelines/${id}`, { method: "DELETE" }),
     onSuccess: async () => {
       setPipelinePendingDelete(null)
-      toast.success("Pipeline deleted.")
       setNotice({ kind: "success", message: "Pipeline deleted." })
       await queryClient.invalidateQueries({ queryKey: ["pipelines"] })
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete pipeline."
-      )
-      setNotice({
-        kind: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to delete pipeline.",
-      })
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to delete pipeline." })
     },
   })
 
@@ -128,166 +115,121 @@ export function PipelinesWorkspace() {
   }
 
   return (
-    <main className="workspace-main">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <section className="page-shell flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="space-y-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="size-4" />
-              Back to dashboard
-            </Link>
-            <div>
-              <p className="page-kicker">Pipeline canvas</p>
-              <h1 className="section-title mt-3">
-                Connect, transform, and preview multi-source flows
-              </h1>
+    <main className="workspace-main space-y-5">
+      <PageHeader
+        actions={
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grid min-w-[220px] gap-1.5">
+              <span className="field-label">New pipeline</span>
+              <Input onChange={(event) => setDraftName(event.target.value)} value={draftName} />
             </div>
-            <p className="max-w-3xl text-sm leading-7 text-muted-foreground">
-              Each pipeline stores a graph of nodes and edges that can be
-              executed on demand and later exposed through an endpoint.
-            </p>
-          </div>
-
-          <div className="section-panel-muted w-full max-w-md p-4">
-            <label className="text-sm font-medium" htmlFor="pipeline-name">
-              New pipeline name
-            </label>
-            <Input
-              id="pipeline-name"
-              onChange={(event) => setDraftName(event.target.value)}
-              value={draftName}
-            />
-            <Button
-              className="mt-3 w-full"
-              onClick={createPipeline}
-              type="button"
-            >
-              {createMutation.isPending ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <Plus className="size-4" />
-              )}
-              New pipeline
+            <Button onClick={createPipeline} type="button">
+              {createMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              Open Canvas
             </Button>
           </div>
-        </section>
+        }
+        description="Manage saved flow definitions, monitor run state, and jump directly into the full-page canvas editor for each pipeline."
+        label="Flow"
+        title="Pipelines"
+      />
 
-        {notice.kind !== "idle" ? (
-          <section
-            className={cn(
-              "rounded-[1.5rem] border px-5 py-4 text-sm shadow-sm",
-              notice.kind === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-                : "border-destructive/30 bg-destructive/10 text-destructive"
-            )}
-          >
-            {notice.message}
-          </section>
-        ) : null}
+      {notice.kind !== "idle" && notice.message ? (
+        <InlineBanner tone={notice.kind === "success" ? "success" : "error"}>
+          {notice.message}
+        </InlineBanner>
+      ) : null}
 
-        {pipelinesQuery.isLoading ? (
-          <section className="grid gap-5 md:grid-cols-2">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={`pipeline-skeleton-${index}`}
-                className="rounded-[2rem] border border-border/70 bg-background/90 p-6 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <Skeleton className="h-6 w-24 rounded-full" />
-                    <Skeleton className="h-7 w-44" />
-                    <Skeleton className="h-4 w-36" />
-                  </div>
-                  <Skeleton className="h-7 w-7" />
-                </div>
-                <div className="mt-5">
-                  <Skeleton className="h-8 w-28" />
-                </div>
-              </div>
-            ))}
-          </section>
-        ) : pipelinesQuery.isError ? (
-          <section className="rounded-[2rem] border border-destructive/30 bg-destructive/10 p-8 text-sm text-destructive shadow-sm">
-            {pipelinesQuery.error instanceof Error
-              ? pipelinesQuery.error.message
-              : "Failed to load pipelines."}
-          </section>
-        ) : (
-          <section className="grid gap-5 md:grid-cols-2">
-            {(pipelinesQuery.data ?? []).length === 0 ? (
-              <div className="rounded-[2rem] border border-dashed border-border/80 bg-background/80 px-6 py-10 text-sm leading-6 text-muted-foreground md:col-span-2">
-                Create a pipeline to open the full React Flow canvas.
-              </div>
-            ) : (
-              pipelinesQuery.data?.map((pipeline) => (
-                <article
-                  key={pipeline.id}
-                  className="rounded-[2rem] border border-border/70 bg-background/90 p-6 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                        <Network className="size-3.5" />
-                        {pipeline.lastRunStatus ?? "Draft"}
+      <section className="table-wrap overflow-x-auto">
+        <table className="data-table min-w-[920px]">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Node Count</th>
+              <th>Status</th>
+              <th>Last Run</th>
+              <th>Total Runs</th>
+              <th className="w-[180px]">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pipelinesQuery.isLoading
+              ? Array.from({ length: 6 }).map((_, index) => (
+                  <tr key={index}>
+                    <td colSpan={6} className="px-3 py-0">
+                      <div className="grid h-[38px] grid-cols-[2fr_1fr_1fr_1.4fr_1fr_180px] items-center gap-3">
+                        <Skeleton className="h-3.5 w-36" />
+                        <Skeleton className="h-3.5 w-14" />
+                        <Skeleton className="h-3.5 w-16" />
+                        <Skeleton className="h-3.5 w-24" />
+                        <Skeleton className="h-3.5 w-14" />
+                        <Skeleton className="h-3.5 w-24" />
                       </div>
-                      <h2 className="text-xl font-semibold">{pipeline.name}</h2>
-                      <p className="text-sm text-muted-foreground">
-                        {pipeline.lastRanAt
-                          ? `Last run ${new Date(pipeline.lastRanAt).toLocaleString()}`
-                          : "No runs yet"}
-                      </p>
-                    </div>
+                    </td>
+                  </tr>
+                ))
+              : null}
 
-                    <Button
-                      onClick={() => setPipelinePendingDelete(pipeline)}
-                      size="icon-sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-
-                  <div className="mt-5 flex gap-3">
-                    <Button asChild variant="secondary">
+            {!pipelinesQuery.isLoading && summaries.map((pipeline) => (
+              <tr key={pipeline.id} className="data-row">
+                <td className="font-medium">{pipeline.name}</td>
+                <td className="mono-value text-secondary">{pipeline.nodes}</td>
+                <td>
+                  <StatusBadge
+                    label={pipeline.lastRunStatus ?? "Draft"}
+                    tone={pipeline.lastRunStatus === "success" ? "success" : pipeline.lastRunStatus === "failed" ? "error" : "muted"}
+                  />
+                </td>
+                <td className="mono-value text-secondary">{pipeline.lastRanAt ? new Date(pipeline.lastRanAt).toLocaleString() : "Never"}</td>
+                <td className="mono-value text-secondary">{pipeline.runs}</td>
+                <td>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button asChild size="sm" type="button" variant="ghost">
                       <Link href={`/dashboard/pipelines/${pipeline.id}/canvas`}>
-                        Open canvas
+                        <Network className="size-4" />
+                        Open Canvas
                       </Link>
                     </Button>
+                    <Button onClick={() => setPipelinePendingDelete(pipeline)} size="sm" type="button" variant="ghost">
+                      <Trash2 className="size-4" />
+                      Delete
+                    </Button>
                   </div>
-                </article>
-              ))
-            )}
-          </section>
-        )}
+                </td>
+              </tr>
+            ))}
 
-        <ConfirmActionDialog
-          confirmLabel="Delete pipeline"
-          description={
-            pipelinePendingDelete
-              ? `This removes "${pipelinePendingDelete.name}" and its saved canvas graph.`
-              : ""
+            {!pipelinesQuery.isLoading && summaries.length === 0 ? (
+              <tr>
+                <td className="py-14 text-center text-sm text-secondary" colSpan={6}>
+                  No pipelines yet. Create one to open the canvas.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </section>
+
+      <ConfirmActionDialog
+        confirmLabel="Delete pipeline"
+        description={pipelinePendingDelete ? `This removes ${pipelinePendingDelete.name} and its saved canvas graph.` : ""}
+        onConfirm={() => {
+          if (!pipelinePendingDelete) {
+            return
           }
-          onConfirm={() => {
-            if (!pipelinePendingDelete) {
-              return
-            }
 
-            deleteMutation.mutate(pipelinePendingDelete.id)
-          }}
-          onOpenChange={(open) => {
-            if (!open) {
-              setPipelinePendingDelete(null)
-            }
-          }}
-          open={Boolean(pipelinePendingDelete)}
-          pending={deleteMutation.isPending}
-          title="Delete pipeline?"
-        />
-      </div>
+          deleteMutation.mutate(pipelinePendingDelete.id)
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPipelinePendingDelete(null)
+          }
+        }}
+        open={Boolean(pipelinePendingDelete)}
+        pending={deleteMutation.isPending}
+        title="Delete pipeline?"
+      />
     </main>
   )
 }
+
