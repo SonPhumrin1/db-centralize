@@ -3,6 +3,7 @@
 import { type ReactNode } from "react"
 import { AlertTriangle, CheckCircle2, Circle } from "lucide-react"
 
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 
 export function PageHeader({
@@ -108,24 +109,12 @@ export function SwitchButton({
   disabled?: boolean
 }) {
   return (
-    <button
-      aria-checked={checked}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 rounded-full border border-border transition-colors",
-        checked ? "bg-[color:var(--accent)]" : "bg-surface-raised",
-        disabled && "cursor-not-allowed opacity-50"
-      )}
+    <Switch
+      checked={checked}
+      className="data-[state=checked]:bg-[color:var(--accent)] data-[state=unchecked]:bg-surface-raised"
       disabled={disabled}
-      onClick={() => onCheckedChange(!checked)}
-      role="switch"
-      type="button"
-    >
-      <span
-        className={cn(
-          "absolute top-[1px] size-4 rounded-full bg-background transition-transform",
-          checked ? "translate-x-4" : "translate-x-[1px]"
-        )}
-      />
-    </button>
+      onCheckedChange={onCheckedChange}
+      size="default"
+    />
   )
 }

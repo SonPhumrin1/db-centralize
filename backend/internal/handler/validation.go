@@ -248,6 +248,80 @@ func validateUpdateSystemSettingsInput(input usecase.UpdateSystemSettingsInput) 
 	return errs
 }
 
+func validateUpdateUserUISettingsInput(input usecase.UpdateUserUISettingsInput) ValidationErrors {
+	var errs ValidationErrors
+
+	if input.Mode == nil && input.Palette == nil && input.Radius == nil && input.Density == nil && input.CustomAccent == nil {
+		errs.Add("body", "at least one field must be provided")
+	}
+	if input.Mode != nil {
+		mode := strings.ToLower(strings.TrimSpace(*input.Mode))
+		if mode != "" && !model.IsValidUIMode(mode) {
+			errs.Add("mode", "mode must be one of: light, dark")
+		}
+	}
+	if input.Palette != nil {
+		palette := strings.ToLower(strings.TrimSpace(*input.Palette))
+		if palette != "" && !model.IsValidUIPalette(palette) {
+			errs.Add("palette", "palette must be one of: neutral, stone, slate, blue, emerald, amber, rose, violet")
+		}
+	}
+	if input.Radius != nil && *input.Radius != 0 && !model.IsValidUIRadius(*input.Radius) {
+		errs.Add("radius", "radius must be one of: 10, 14, 18, 24")
+	}
+	if input.Density != nil {
+		density := strings.ToLower(strings.TrimSpace(*input.Density))
+		if density != "" && !model.IsValidUIDensity(density) {
+			errs.Add("density", "density must be one of: compact, comfortable, spacious")
+		}
+	}
+	if input.CustomAccent != nil {
+		customAccent := strings.TrimSpace(*input.CustomAccent)
+		if customAccent != "" && !model.IsValidUICustomAccent(customAccent) {
+			errs.Add("customAccent", "customAccent must be a hex color like #3b82f6")
+		}
+	}
+
+	return errs
+}
+
+func validateUpdateUISettingsDefaultsInput(input usecase.UpdateUISettingsDefaultsInput) ValidationErrors {
+	var errs ValidationErrors
+
+	if input.Mode == nil && input.Palette == nil && input.Radius == nil && input.Density == nil && input.CustomAccent == nil {
+		errs.Add("body", "at least one field must be provided")
+	}
+	if input.Mode != nil {
+		mode := strings.ToLower(strings.TrimSpace(*input.Mode))
+		if mode != "" && !model.IsValidUIMode(mode) {
+			errs.Add("mode", "mode must be one of: light, dark")
+		}
+	}
+	if input.Palette != nil {
+		palette := strings.ToLower(strings.TrimSpace(*input.Palette))
+		if palette != "" && !model.IsValidUIPalette(palette) {
+			errs.Add("palette", "palette must be one of: neutral, stone, slate, blue, emerald, amber, rose, violet")
+		}
+	}
+	if input.Radius != nil && *input.Radius != 0 && !model.IsValidUIRadius(*input.Radius) {
+		errs.Add("radius", "radius must be one of: 10, 14, 18, 24")
+	}
+	if input.Density != nil {
+		density := strings.ToLower(strings.TrimSpace(*input.Density))
+		if density != "" && !model.IsValidUIDensity(density) {
+			errs.Add("density", "density must be one of: compact, comfortable, spacious")
+		}
+	}
+	if input.CustomAccent != nil {
+		customAccent := strings.TrimSpace(*input.CustomAccent)
+		if customAccent != "" && !model.IsValidUICustomAccent(customAccent) {
+			errs.Add("customAccent", "customAccent must be a hex color like #3b82f6")
+		}
+	}
+
+	return errs
+}
+
 func validateChangeRootPasswordInput(input usecase.ChangeRootPasswordInput) ValidationErrors {
 	var errs ValidationErrors
 

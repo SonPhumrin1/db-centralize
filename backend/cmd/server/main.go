@@ -90,6 +90,9 @@ func main() {
 	api := app.Group("/api/v1", middleware.SessionAuthMiddleware(gormDB))
 	api.Get("/me", handler.Me)
 	api.Get("/settings", systemSettingsHandler.Get)
+	api.Get("/settings/ui", systemSettingsHandler.GetUI)
+	api.Patch("/settings/ui", systemSettingsHandler.UpdateUI)
+	api.Delete("/settings/ui", systemSettingsHandler.ResetUI)
 	api.Get("/datasources", dataSourceHandler.List)
 	api.Post("/datasources", dataSourceHandler.Create)
 	api.Post("/datasources/test-connection", dataSourceHandler.TestDraft)
@@ -124,6 +127,7 @@ func main() {
 	admin.Post("/users", adminUserHandler.Create)
 	admin.Patch("/users/:id", adminUserHandler.Update)
 	admin.Patch("/settings", systemSettingsHandler.Update)
+	admin.Patch("/settings/ui-defaults", systemSettingsHandler.UpdateUIDefaults)
 	admin.Post("/settings/root-password", systemSettingsHandler.ChangeRootPassword)
 
 	app.Post("/webhooks/telegram/:id", telegramIntegrationHandler.Webhook)

@@ -5,20 +5,25 @@ import "time"
 
 // User stores dashboard credentials and authorization state.
 type User struct {
-	ID              uint      `gorm:"primaryKey"`
-	Name            string    `gorm:"size:255;not null"`
-	Email           string    `gorm:"size:320;uniqueIndex;not null"`
-	EmailVerified   bool      `gorm:"column:email_verified;not null;default:false"`
-	Image           *string   `gorm:"size:2048"`
-	Username        string    `gorm:"size:255;uniqueIndex;not null"`
-	DisplayUsername *string   `gorm:"column:display_username;size:255"`
-	PasswordHash    string    `gorm:"column:password_hash;not null"`
-	Role            string    `gorm:"size:32;not null;default:member"`
-	IsActive        bool      `gorm:"column:is_active;not null;default:true"`
-	CreatedAt       time.Time `gorm:"column:created_at;not null"`
-	UpdatedAt       time.Time `gorm:"column:updated_at;not null"`
-	Sessions        []Session `gorm:"foreignKey:UserID"`
-	Accounts        []Account `gorm:"foreignKey:UserID"`
+	ID                     uint      `gorm:"primaryKey"`
+	Name                   string    `gorm:"size:255;not null"`
+	Email                  string    `gorm:"size:320;uniqueIndex;not null"`
+	EmailVerified          bool      `gorm:"column:email_verified;not null;default:false"`
+	Image                  *string   `gorm:"size:2048"`
+	Username               string    `gorm:"size:255;uniqueIndex;not null"`
+	DisplayUsername        *string   `gorm:"column:display_username;size:255"`
+	PasswordHash           string    `gorm:"column:password_hash;not null"`
+	Role                   string    `gorm:"size:32;not null;default:member"`
+	IsActive               bool      `gorm:"column:is_active;not null;default:true"`
+	UIModeOverride         *string   `gorm:"column:ui_theme_override;size:16"`
+	UIPaletteOverride      *string   `gorm:"column:ui_palette_override;size:24"`
+	UIRadiusOverride       *int      `gorm:"column:ui_radius_override"`
+	UIDensityOverride      *string   `gorm:"column:ui_density_override;size:24"`
+	UICustomAccentOverride *string   `gorm:"column:ui_custom_accent_override;size:16"`
+	CreatedAt              time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt              time.Time `gorm:"column:updated_at;not null"`
+	Sessions               []Session `gorm:"foreignKey:UserID"`
+	Accounts               []Account `gorm:"foreignKey:UserID"`
 }
 
 func (User) TableName() string {

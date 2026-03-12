@@ -51,6 +51,77 @@ func (h *SystemSettingsHandler) Update(c fiber.Ctx) error {
 	return c.JSON(settings)
 }
 
+func (h *SystemSettingsHandler) GetUI(c fiber.Ctx) error {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return unauthorized(c)
+	}
+
+	settings, err := h.usecase.GetUI(c.Context(), userID)
+	if err != nil {
+		return mapSystemSettingsError(c, err)
+	}
+
+	return c.JSON(settings)
+}
+
+func (h *SystemSettingsHandler) UpdateUI(c fiber.Ctx) error {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return unauthorized(c)
+	}
+
+	var input usecase.UpdateUserUISettingsInput
+	if err := json.Unmarshal(c.Body(), &input); err != nil {
+		return invalidJSONBody(c)
+	}
+	if errs := validateUpdateUserUISettingsInput(input); errs.HasAny() {
+		return validationFailed(c, errs...)
+	}
+
+	settings, err := h.usecase.UpdateUI(c.Context(), userID, input)
+	if err != nil {
+		return mapSystemSettingsError(c, err)
+	}
+
+	return c.JSON(settings)
+}
+
+func (h *SystemSettingsHandler) ResetUI(c fiber.Ctx) error {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return unauthorized(c)
+	}
+
+	settings, err := h.usecase.ResetUI(c.Context(), userID)
+	if err != nil {
+		return mapSystemSettingsError(c, err)
+	}
+
+	return c.JSON(settings)
+}
+
+func (h *SystemSettingsHandler) UpdateUIDefaults(c fiber.Ctx) error {
+	if _, ok := currentUserID(c); !ok {
+		return unauthorized(c)
+	}
+
+	var input usecase.UpdateUISettingsDefaultsInput
+	if err := json.Unmarshal(c.Body(), &input); err != nil {
+		return invalidJSONBody(c)
+	}
+	if errs := validateUpdateUISettingsDefaultsInput(input); errs.HasAny() {
+		return validationFailed(c, errs...)
+	}
+
+	settings, err := h.usecase.UpdateUIDefaults(c.Context(), input)
+	if err != nil {
+		return mapSystemSettingsError(c, err)
+	}
+
+	return c.JSON(settings)
+}
+
 func (h *SystemSettingsHandler) ChangeRootPassword(c fiber.Ctx) error {
 	if _, ok := currentUserID(c); !ok {
 		return unauthorized(c)
@@ -77,6 +148,11 @@ func mapSystemSettingsError(c fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "system settings not found"})
 	case errors.Is(err, usecase.ErrInvalidPlatformName),
 		errors.Is(err, usecase.ErrInvalidDefaultPageSize),
+		errors.Is(err, usecase.ErrInvalidUIMode),
+		errors.Is(err, usecase.ErrInvalidUIPalette),
+		errors.Is(err, usecase.ErrInvalidUIRadius),
+		errors.Is(err, usecase.ErrInvalidUIDensity),
+		errors.Is(err, usecase.ErrInvalidUICustomAccent),
 		errors.Is(err, usecase.ErrInvalidRootPassword),
 		errors.Is(err, usecase.ErrRootPasswordConfirmation):
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})

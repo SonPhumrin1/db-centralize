@@ -17,8 +17,8 @@ import {
 } from "@/lib/sidebar-preferences"
 
 const sidebarInset = 12
-const collapsedSidebarPanelWidth = 72
-const expandedSidebarPanelWidth = 208
+const collapsedSidebarPanelWidth = 64
+const expandedSidebarPanelWidth = 188
 
 export function DashboardShell({
   children,
@@ -78,14 +78,17 @@ export function DashboardShell({
     }
   }, [])
 
-  const expanded = mode === "auto" ? hovered || keyboardFocusWithin : !manualCollapsed
+  const expanded =
+    mode === "auto"
+      ? hovered || (keyboardFocusWithin && inputMethodRef.current === "keyboard")
+      : !manualCollapsed
   const sidebarPanelWidth = expanded
     ? expandedSidebarPanelWidth
     : collapsedSidebarPanelWidth
   const sidebarWidth = sidebarPanelWidth + sidebarInset
 
   return (
-    <div className="app-shell md:flex">
+    <div className="app-shell md:flex md:gap-4 lg:gap-5">
       <DashboardSidebar
         expanded={expanded}
         inputMethodRef={inputMethodRef}
@@ -100,6 +103,7 @@ export function DashboardShell({
         }}
         platformName={platformName}
         role={role}
+        sidebarInset={sidebarInset}
         sidebarPanelWidth={sidebarPanelWidth}
         sidebarWidth={sidebarWidth}
         username={username}

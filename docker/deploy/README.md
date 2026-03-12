@@ -51,12 +51,14 @@ APP_PUBLIC_URL=https://data.example.com
 API_PUBLIC_URL=https://data-api.example.com
 API_PORT=8080
 FRONTEND_PORT=3000
-DATABASE_URL=postgres://dp:super-secret-password@postgres:5432/dataplatform
+DATABASE_URL=postgres://dpx:super-secret-password@postgres:5432/dpx?sslmode=disable
 REDIS_URL=redis://redis:6379
 INTERNAL_API_URL=http://backend:8080
 ENCRYPTION_KEY=BASE64_32_BYTE_KEY_HERE
 BETTER_AUTH_SECRET=LONG_RANDOM_SECRET_HERE
 POSTGRES_PASSWORD=super-secret-password
+POSTGRES_DB=dpx
+POSTGRES_USER=dpx
 BOOTSTRAP_ROOT_USERNAME=root
 BOOTSTRAP_ROOT_PASSWORD=replace-me
 ```

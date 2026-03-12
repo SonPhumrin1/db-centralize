@@ -511,6 +511,110 @@ func TestSystemSettingsUsecaseUpdateAndChangeRootPassword(t *testing.T) {
 	}
 }
 
+func TestSystemSettingsUsecaseUIAppearanceMergeAndReset(t *testing.T) {
+	t.Parallel()
+
+	db := testutil.OpenTestDB(t)
+	ctx := context.Background()
+	settingsRepo := repository.NewSystemSettingsRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	uc := NewSystemSettingsUsecase(db, settingsRepo, userRepo, "root")
+
+	user := testutil.MustCreateUser(t, db, testutil.UserSeed{
+		Username: "ui-member",
+		Email:    "ui-member@example.com",
+	})
+	other := testutil.MustCreateUser(t, db, testutil.UserSeed{
+		Username: "ui-other",
+		Email:    "ui-other@example.com",
+	})
+
+	initial, err := uc.GetUI(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("get initial ui settings: %v", err)
+	}
+	if initial.Resolved.Mode != model.DefaultUIMode() || initial.Resolved.Palette != model.DefaultUIPalette() || initial.Resolved.Radius != model.DefaultUIRadius() || initial.Resolved.Density != model.DefaultUIDensity() {
+		t.Fatalf("unexpected initial ui settings: %#v", initial)
+	}
+	if initial.Override.Mode != nil || initial.Override.Palette != nil || initial.Override.Radius != nil || initial.Override.Density != nil || initial.Override.CustomAccent != nil {
+		t.Fatalf("expected no overrides initially: %#v", initial.Override)
+	}
+	if initial.CanManageDefaults {
+		t.Fatalf("expected member user to be unable to manage defaults")
+	}
+
+	mode := "dark"
+	palette := "rose"
+	radius := 24
+	density := "compact"
+	updated, err := uc.UpdateUI(ctx, user.ID, UpdateUserUISettingsInput{
+		Mode:    &mode,
+		Palette: &palette,
+		Radius:  &radius,
+		Density: &density,
+	})
+	if err != nil {
+		t.Fatalf("update ui overrides: %v", err)
+	}
+	if updated.Resolved.Mode != model.UIModeDark || updated.Resolved.Palette != model.UIPaletteRose || updated.Resolved.Radius != model.UIRadius24 || updated.Resolved.Density != model.UIDensityCompact {
+		t.Fatalf("unexpected updated ui settings: %#v", updated)
+	}
+	if updated.Override.Mode == nil || *updated.Override.Mode != model.UIModeDark {
+		t.Fatalf("expected mode override persisted, got %#v", updated.Override.Mode)
+	}
+
+	customAccent := "#f43f5e"
+	defaults, err := uc.UpdateUIDefaults(ctx, UpdateUISettingsDefaultsInput{
+		Mode:         &mode,
+		Palette:      &palette,
+		Radius:       &radius,
+		Density:      &density,
+		CustomAccent: &customAccent,
+	})
+	if err != nil {
+		t.Fatalf("update ui defaults: %v", err)
+	}
+	if defaults.Mode != model.UIModeDark || defaults.Palette != model.UIPaletteRose || defaults.Radius != model.UIRadius24 || defaults.Density != model.UIDensityCompact || defaults.CustomAccent == nil || *defaults.CustomAccent != "#f43f5e" {
+		t.Fatalf("unexpected defaults view: %#v", defaults)
+	}
+
+	otherView, err := uc.GetUI(ctx, other.ID)
+	if err != nil {
+		t.Fatalf("get inherited ui settings: %v", err)
+	}
+	if otherView.Resolved.Mode != model.UIModeDark || otherView.Resolved.Palette != model.UIPaletteRose || otherView.Resolved.Radius != model.UIRadius24 || otherView.Resolved.Density != model.UIDensityCompact || otherView.Resolved.CustomAccent == nil || *otherView.Resolved.CustomAccent != "#f43f5e" {
+		t.Fatalf("expected inherited defaults for other user, got %#v", otherView)
+	}
+	if otherView.CanManageDefaults {
+		t.Fatalf("expected non-admin user to inherit defaults without admin permissions")
+	}
+
+	overrideAccent := "#fb7185"
+	updated, err = uc.UpdateUI(ctx, user.ID, UpdateUserUISettingsInput{
+		CustomAccent: &overrideAccent,
+	})
+	if err != nil {
+		t.Fatalf("update custom accent override: %v", err)
+	}
+	if updated.Resolved.Mode != model.UIModeDark || updated.Resolved.Palette != model.UIPaletteRose || updated.Resolved.Radius != model.UIRadius24 || updated.Resolved.Density != model.UIDensityCompact {
+		t.Fatalf("expected merged user settings after partial update, got %#v", updated)
+	}
+	if updated.Override.CustomAccent == nil || *updated.Override.CustomAccent != "#fb7185" {
+		t.Fatalf("expected custom accent override, got %#v", updated.Override.CustomAccent)
+	}
+
+	reset, err := uc.ResetUI(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("reset ui overrides: %v", err)
+	}
+	if reset.Resolved.Mode != model.UIModeDark || reset.Resolved.Palette != model.UIPaletteRose || reset.Resolved.Radius != model.UIRadius24 || reset.Resolved.Density != model.UIDensityCompact || reset.Resolved.CustomAccent == nil || *reset.Resolved.CustomAccent != "#f43f5e" {
+		t.Fatalf("expected reset to inherited defaults, got %#v", reset)
+	}
+	if reset.Override.Mode != nil || reset.Override.Palette != nil || reset.Override.Radius != nil || reset.Override.Density != nil || reset.Override.CustomAccent != nil {
+		t.Fatalf("expected overrides cleared after reset: %#v", reset.Override)
+	}
+}
+
 func seedRESTSource(t *testing.T, gormDB *gorm.DB, userID uint, baseURL string) *model.DataSource {
 	t.Helper()
 

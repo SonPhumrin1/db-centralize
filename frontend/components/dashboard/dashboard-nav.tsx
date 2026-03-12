@@ -33,18 +33,16 @@ const baseItems = [
   { href: "/dashboard/endpoints", icon: Cable, label: "Endpoints", dividerAfter: false },
   { href: "/dashboard/pipelines", icon: Workflow, label: "Pipelines", dividerAfter: false },
   { href: "/dashboard/integrations", icon: Bot, label: "Integrations", dividerAfter: true },
+  { href: "/dashboard/settings", icon: Settings, label: "Settings", dividerAfter: false },
 ]
 
 export function DashboardNav({
-  isAdmin,
   orientation = "vertical",
   collapsed = false,
   tone = "default",
 }: DashboardNavProps) {
   const pathname = usePathname()
-  const items = isAdmin
-    ? [...baseItems, { href: "/dashboard/settings", icon: Settings, label: "Settings", dividerAfter: false }]
-    : baseItems
+  const items = baseItems
 
   return (
     <nav
@@ -70,11 +68,11 @@ export function DashboardNav({
               orientation === "horizontal" ? "shrink-0" : "w-full",
               orientation === "vertical" &&
                 (collapsed
-                  ? "size-9 justify-center gap-0 rounded-lg px-0 py-0"
-                  : "gap-3 rounded-lg px-3 py-2.5"),
+                  ? "size-9 justify-center gap-0 rounded-[var(--radius-md)] px-0 py-0"
+                  : "gap-3 rounded-[var(--radius-md)] px-3 py-2.5"),
               isActive
                 ? tone === "sidebar"
-                  ? "bg-[color:var(--sidebar-active)] text-[color:var(--sidebar-foreground)] shadow-[inset_0_0_0_1px_var(--sidebar-active-border)]"
+                  ? "bg-[color:var(--sidebar-active)] text-[color:var(--sidebar-active-foreground)] shadow-[inset_0_0_0_1px_var(--sidebar-active-border)]"
                   : "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent)_18%,transparent)]"
                 : tone === "sidebar"
                   ? "text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]"

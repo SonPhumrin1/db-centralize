@@ -28,6 +28,7 @@ export function DashboardSidebar({
   role,
   platformName,
   isAdmin,
+  sidebarInset,
   sidebarPanelWidth,
   sidebarWidth,
 }: {
@@ -42,6 +43,7 @@ export function DashboardSidebar({
   role: string
   platformName: string
   isAdmin: boolean
+  sidebarInset: number
   sidebarPanelWidth: number
   sidebarWidth: number
 }) {
@@ -49,14 +51,14 @@ export function DashboardSidebar({
 
   return (
     <aside
-      className="relative hidden md:sticky md:top-0 md:block md:h-svh md:shrink-0 md:self-start md:transition-[width] md:duration-300 md:ease-[cubic-bezier(0.22,1,0.36,1)]"
+      className="relative hidden md:block md:h-svh md:shrink-0 md:self-start md:transition-[width] md:duration-360 md:ease-[cubic-bezier(0.2,0.9,0.24,1)]"
       style={{ width: `${sidebarWidth}px` }}
     >
       <div
         className={cn(
-          "my-3 ml-3 flex h-[calc(100svh-24px)] overflow-hidden rounded-[24px] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl transition-[width,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          "fixed top-3 z-30 flex h-[calc(100svh-24px)] overflow-hidden rounded-[calc(var(--radius-lg)+10px)] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl transition-[width,background-color,border-color,box-shadow] duration-420 ease-[cubic-bezier(0.16,1,0.3,1)]"
         )}
-        style={{ width: `${sidebarPanelWidth}px` }}
+        style={{ left: `${sidebarInset}px`, width: `${sidebarPanelWidth}px` }}
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
             onKeyboardFocusChange(false)
@@ -68,7 +70,12 @@ export function DashboardSidebar({
           }
         }}
         onMouseEnter={() => onHoverChange(true)}
-        onMouseLeave={() => onHoverChange(false)}
+        onMouseLeave={() => {
+          onHoverChange(false)
+          if (inputMethodRef.current === "pointer") {
+            onKeyboardFocusChange(false)
+          }
+        }}
         onPointerDownCapture={() => {
           inputMethodRef.current = "pointer"
           onKeyboardFocusChange(false)
@@ -77,13 +84,13 @@ export function DashboardSidebar({
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             className={cn(
-              "flex items-center border-b border-[color:var(--sidebar-border)] transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "flex items-center border-b border-[color:var(--sidebar-border)] transition-[padding] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
               expanded ? "justify-between px-4 py-4" : "justify-center px-3 py-4"
             )}
           >
             <div className="flex min-w-0 items-center gap-3">
               <div
-                className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--sidebar-border)] bg-[color:var(--sidebar-surface)] text-sm font-semibold text-[color:var(--sidebar-foreground)]"
+                className="flex size-10 shrink-0 items-center justify-center rounded-[calc(var(--radius-lg)+4px)] border border-[color:var(--sidebar-border)] bg-[color:var(--sidebar-surface)] text-sm font-semibold text-[color:var(--sidebar-foreground)]"
                 title={platformName}
               >
                 DP
@@ -91,14 +98,16 @@ export function DashboardSidebar({
               <div
                 aria-hidden={!expanded}
                 className={cn(
-                  "min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                  expanded ? "max-w-40 opacity-100 translate-x-0" : "max-w-0 opacity-0 -translate-x-1"
+                  "min-w-0 overflow-hidden transition-[max-width,opacity,transform] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  expanded
+                    ? "max-w-[110px] opacity-100 translate-x-0"
+                    : "max-w-0 opacity-0 -translate-x-1"
                 )}
               >
                 <p className="truncate font-mono text-[10px] tracking-[0.14em] text-[color:var(--sidebar-subtle)] uppercase">
                   {platformName}
                 </p>
-                <p className="mt-1 truncate text-sm font-medium text-[color:var(--sidebar-foreground)]">
+                <p className="mt-1 text-[13px] font-medium leading-[1.15] text-[color:var(--sidebar-foreground)]">
                   Project Overview
                 </p>
               </div>
@@ -126,7 +135,7 @@ export function DashboardSidebar({
 
           <div
             className={cn(
-              "flex-1 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "flex-1 transition-[padding] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
               expanded ? "px-3 py-4" : "px-2 py-4"
             )}
           >
@@ -135,7 +144,7 @@ export function DashboardSidebar({
 
           <div
             className={cn(
-              "border-t border-[color:var(--sidebar-border)] transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "border-t border-[color:var(--sidebar-border)] transition-[padding] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
               expanded ? "px-3 py-3" : "px-2 py-3"
             )}
           >
@@ -155,7 +164,7 @@ export function DashboardSidebar({
                 </div>
                 <form action={signOut} className="mt-3">
                   <Button
-                    className="w-full justify-between rounded-lg border border-[color:var(--sidebar-border)] bg-[color:var(--sidebar-surface)] text-[color:var(--sidebar-foreground)] hover:bg-[color:var(--sidebar-hover)]"
+                    className="w-full justify-between rounded-[var(--radius-md)] border border-[color:var(--sidebar-border)] bg-[color:var(--sidebar-surface)] text-[color:var(--sidebar-foreground)] hover:bg-[color:var(--sidebar-hover)]"
                     type="submit"
                     variant="outline"
                   >
@@ -167,7 +176,7 @@ export function DashboardSidebar({
             ) : (
               <div className="flex h-full flex-col items-center justify-end gap-3 pb-1">
                 <div
-                  className="flex size-10 items-center justify-center rounded-full border border-[color:var(--sidebar-border)] bg-[color:var(--sidebar-surface)] text-xs font-semibold uppercase text-[color:var(--sidebar-foreground)]"
+                  className="flex size-10 items-center justify-center rounded-[calc(var(--radius-lg)+999px)] border border-[color:var(--sidebar-border)] bg-[color:var(--sidebar-surface)] text-xs font-semibold uppercase text-[color:var(--sidebar-foreground)]"
                   title={`${username} · ${role}`}
                 >
                   {displayName.slice(0, 1)}

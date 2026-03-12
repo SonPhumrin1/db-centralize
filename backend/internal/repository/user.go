@@ -88,13 +88,18 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 		Model(&model.User{}).
 		Where("id = ?", user.ID).
 		Updates(map[string]any{
-			"role":          user.Role,
-			"is_active":     user.IsActive,
-			"updated_at":    user.UpdatedAt,
-			"name":          user.Name,
-			"email":         user.Email,
-			"username":      user.Username,
-			"password_hash": user.PasswordHash,
+			"role":                      user.Role,
+			"is_active":                 user.IsActive,
+			"updated_at":                user.UpdatedAt,
+			"name":                      user.Name,
+			"email":                     user.Email,
+			"username":                  user.Username,
+			"password_hash":             user.PasswordHash,
+			"ui_theme_override":         user.UIModeOverride,
+			"ui_palette_override":       user.UIPaletteOverride,
+			"ui_radius_override":        user.UIRadiusOverride,
+			"ui_density_override":       user.UIDensityOverride,
+			"ui_custom_accent_override": user.UICustomAccentOverride,
 		})
 	if result.Error != nil {
 		return fmt.Errorf("update user: %w", result.Error)

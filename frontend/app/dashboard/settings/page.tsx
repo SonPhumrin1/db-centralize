@@ -16,17 +16,15 @@ export default async function SettingsPage() {
   }
 
   const backendMe = await getBackendMe()
-  if (!isAdminRole(backendMe?.role)) {
-    redirect("/dashboard")
-  }
-
+  const isAdmin = isAdminRole(backendMe?.role)
   const settings = await getSystemSettings()
 
   return (
-    <main className="px-2 py-2 md:px-0 md:py-4">
+    <main className="px-2 py-2 md:px-2 md:py-4 lg:px-3">
       <AdminSettingsWorkspace
         currentUserId={Number(backendMe?.id ?? 0)}
         initialPlatformName={settings?.platformName ?? "Data Platform"}
+        isAdmin={isAdmin}
       />
     </main>
   )

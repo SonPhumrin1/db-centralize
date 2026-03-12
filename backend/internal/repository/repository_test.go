@@ -301,8 +301,37 @@ func TestUserAndSystemSettingsRepositories(t *testing.T) {
 	}
 
 	user.Role = "admin"
+	mode := model.UIModeDark
+	palette := model.UIPaletteEmerald
+	radius := model.UIRadius18
+	density := model.UIDensitySpacious
+	customAccent := "#22c55e"
+	user.UIModeOverride = &mode
+	user.UIPaletteOverride = &palette
+	user.UIRadiusOverride = &radius
+	user.UIDensityOverride = &density
+	user.UICustomAccentOverride = &customAccent
 	if err := userRepo.Update(ctx, user); err != nil {
 		t.Fatalf("update user: %v", err)
+	}
+	reloadedUser, err := userRepo.FindByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("reload user: %v", err)
+	}
+	if reloadedUser.UIModeOverride == nil || *reloadedUser.UIModeOverride != model.UIModeDark {
+		t.Fatalf("expected mode override persisted, got %#v", reloadedUser.UIModeOverride)
+	}
+	if reloadedUser.UIPaletteOverride == nil || *reloadedUser.UIPaletteOverride != model.UIPaletteEmerald {
+		t.Fatalf("expected palette override persisted, got %#v", reloadedUser.UIPaletteOverride)
+	}
+	if reloadedUser.UIRadiusOverride == nil || *reloadedUser.UIRadiusOverride != model.UIRadius18 {
+		t.Fatalf("expected radius override persisted, got %#v", reloadedUser.UIRadiusOverride)
+	}
+	if reloadedUser.UIDensityOverride == nil || *reloadedUser.UIDensityOverride != model.UIDensitySpacious {
+		t.Fatalf("expected density override persisted, got %#v", reloadedUser.UIDensityOverride)
+	}
+	if reloadedUser.UICustomAccentOverride == nil || *reloadedUser.UICustomAccentOverride != "#22c55e" {
+		t.Fatalf("expected custom accent override persisted, got %#v", reloadedUser.UICustomAccentOverride)
 	}
 
 	settings, err := settingsRepo.Get(ctx)
@@ -312,10 +341,25 @@ func TestUserAndSystemSettingsRepositories(t *testing.T) {
 	if settings.PlatformName == "" || settings.DefaultPageSize == 0 {
 		t.Fatalf("unexpected default settings: %#v", settings)
 	}
+	if settings.UIModeDefault != model.DefaultUIMode() || settings.UIPaletteDefault != model.DefaultUIPalette() || settings.UIRadiusDefault != model.DefaultUIRadius() || settings.UIDensityDefault != model.DefaultUIDensity() || settings.UICustomAccentDefault != nil {
+		t.Fatalf("unexpected default ui settings: %#v", settings)
+	}
 
 	settings.PlatformName = "Control Center"
 	settings.DefaultPageSize = 50
+	settings.UIModeDefault = model.UIModeDark
+	settings.UIPaletteDefault = model.UIPaletteViolet
+	settings.UIRadiusDefault = model.UIRadius24
+	settings.UIDensityDefault = model.UIDensityCompact
+	settings.UICustomAccentDefault = &customAccent
 	if err := settingsRepo.Update(ctx, settings); err != nil {
 		t.Fatalf("update settings: %v", err)
+	}
+	reloadedSettings, err := settingsRepo.Get(ctx)
+	if err != nil {
+		t.Fatalf("reload settings: %v", err)
+	}
+	if reloadedSettings.UIModeDefault != model.UIModeDark || reloadedSettings.UIPaletteDefault != model.UIPaletteViolet || reloadedSettings.UIRadiusDefault != model.UIRadius24 || reloadedSettings.UIDensityDefault != model.UIDensityCompact || reloadedSettings.UICustomAccentDefault == nil || *reloadedSettings.UICustomAccentDefault != "#22c55e" {
+		t.Fatalf("expected ui defaults persisted, got %#v", reloadedSettings)
 	}
 }

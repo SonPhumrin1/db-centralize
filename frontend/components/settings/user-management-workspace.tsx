@@ -160,9 +160,9 @@ export function UserManagementWorkspace({ currentUserId }: { currentUserId: numb
             <tr>
               <th>Name</th>
               <th>Email</th>
-              <th>Role</th>
+              <th className="w-[220px]">Role</th>
               <th>Status</th>
-              <th className="w-[180px]">Actions</th>
+              <th className="w-[132px] text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -196,28 +196,30 @@ export function UserManagementWorkspace({ currentUserId }: { currentUserId: numb
                     <div className="mono-value text-secondary">{user.username}</div>
                   </td>
                   <td className="text-sm">{user.email}</td>
-                  <td>
-                    <select
-                      className="field-select w-[120px]"
-                      disabled={isPending}
-                      onChange={(event) =>
-                        updateMutation.mutate({
-                          id: user.id,
-                          payload: { role: event.target.value as AdminUser["role"] },
-                        })
-                      }
-                      value={user.role}
-                    >
-                      {adminRoleOptions.map((role) => (
-                        <option key={role.value} value={role.value}>{role.label}</option>
-                      ))}
-                    </select>
+                  <td className="w-[220px]">
+                    <div className="w-full max-w-[220px]">
+                      <select
+                        className="field-select"
+                        disabled={isPending}
+                        onChange={(event) =>
+                          updateMutation.mutate({
+                            id: user.id,
+                            payload: { role: event.target.value as AdminUser["role"] },
+                          })
+                        }
+                        value={user.role}
+                      >
+                        {adminRoleOptions.map((role) => (
+                          <option key={role.value} value={role.value}>{role.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                   <td>
                     <StatusBadge label={user.isActive ? "Active" : "Inactive"} tone={user.isActive ? "success" : "muted"} />
                   </td>
-                  <td>
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="w-[132px]">
+                    <div className="flex items-center justify-end pr-1">
                       <SwitchButton
                         checked={user.isActive}
                         disabled={isPending}
@@ -272,5 +274,4 @@ export function UserManagementWorkspace({ currentUserId }: { currentUserId: numb
     </section>
   )
 }
-
 
