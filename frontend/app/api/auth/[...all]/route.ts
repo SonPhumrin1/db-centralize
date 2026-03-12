@@ -1,5 +1,18 @@
-import { toNextJsHandler } from "better-auth/next-js"
+import { NextResponse } from "next/server"
 
-import { auth } from "@/lib/auth"
+function deprecatedAuthRoute() {
+  return NextResponse.json(
+    {
+      error: "frontend auth route disabled",
+    },
+    { status: 404 }
+  )
+}
 
-export const { GET, POST, PATCH, PUT, DELETE } = toNextJsHandler(auth)
+export {
+  deprecatedAuthRoute as DELETE,
+  deprecatedAuthRoute as GET,
+  deprecatedAuthRoute as PATCH,
+  deprecatedAuthRoute as POST,
+  deprecatedAuthRoute as PUT,
+}

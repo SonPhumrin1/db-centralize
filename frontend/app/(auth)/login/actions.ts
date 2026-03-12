@@ -20,7 +20,7 @@ function getBackendBaseUrl() {
   )
 }
 
-function useSecureSessionCookie() {
+function shouldUseSecureSessionCookie() {
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ?? process.env.BETTER_AUTH_URL ?? ""
   return appUrl.startsWith("https://")
@@ -68,7 +68,7 @@ export async function loginWithUsername(
     httpOnly: true,
     path: "/",
     sameSite: "lax",
-    secure: useSecureSessionCookie(),
+    secure: shouldUseSecureSessionCookie(),
   })
 
   redirect(nextPath.startsWith("/") ? nextPath : "/dashboard")
