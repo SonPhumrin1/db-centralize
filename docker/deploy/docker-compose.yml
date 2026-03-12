@@ -1,22 +1,22 @@
 services:
   postgres:
-    image: postgres:16.8
+    image: postgres:18-alpine
     environment:
-      POSTGRES_DB: dataplatform
-      POSTGRES_USER: dp
+      POSTGRES_DB: ${POSTGRES_DB:-dpx}
+      POSTGRES_USER: ${POSTGRES_USER:-dpx}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - dataplatform-pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/18/docker
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dp -d dataplatform"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dpx} -d ${POSTGRES_DB:-dpx}"]
       interval: 5s
       timeout: 5s
       retries: 12
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:8-alpine
     volumes:
-      - dataplatform-redisdata:/data
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -76,5 +76,5 @@ services:
       retries: 20
 
 volumes:
-  dataplatform-pgdata:
-  dataplatform-redisdata:
+  pgdata:
+  redisdata:
