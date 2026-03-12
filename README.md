@@ -38,12 +38,11 @@ Important URL note:
 
 ## Quick Start
 
-### Option 1: Docker Compose
-
-From the repo root:
+### Option 1: Local Docker
 
 ```bash
-cp .env.example .env
+cd docker/local
+cp .env.example .env      # edit secrets if needed
 docker compose up --build
 ```
 
@@ -51,12 +50,28 @@ Services:
 
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8080`
-- Postgres: internal `postgres:5432`
-- Redis: internal `redis:6379`
+- Sample Postgres: `localhost:5433`
+- Sample MySQL: `localhost:3307`
+- Sample REST: `http://localhost:8090`
 
-### Option 1b: Coolify deployment
+Login: `root` / `123`
 
-Use the dedicated Coolify bundle in [docker/coolify](/Users/phumrin/Documents/cubis_project/db-centralize/docker/coolify/README.md). Do not reuse the local Docker env file for deployment.
+See [docker/local/README.md](docker/local/README.md) for full details.
+
+### Option 2: Coolify deployment
+
+Use the dedicated Coolify stack in [docker/coolify/](docker/coolify/README.md).
+
+1. Point Coolify at `docker/coolify/docker-compose.yml`.
+2. Set env vars in Coolify — copy from `docker/coolify/.env.example`.
+3. Assign domains in Coolify's UI:
+   - `frontend` service → your app domain (e.g. `app.example.com`)
+   - `backend` service → your api domain (e.g. `api.example.com`)
+4. Set `APP_PUBLIC_URL` and `API_PUBLIC_URL` to match those domains.
+
+No ports are exposed to the host — Coolify's built-in proxy handles TLS and routing.
+
+Do not reuse the local Docker `.env` for deployment.
 
 ### Option 2: Run services locally
 

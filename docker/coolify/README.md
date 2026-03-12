@@ -1,6 +1,8 @@
 # Coolify Deployment
 
-This folder is the deploy-ready counterpart to [`docker/local`](/Users/phumrin/Documents/cubis_project/db-centralize/docker/local/README.md). It avoids `localhost` assumptions and splits public URLs from internal container URLs.
+This folder is the deploy-ready counterpart to [`docker/local`](../local/README.md). It avoids `localhost` assumptions and splits public URLs from internal container URLs.
+
+No ports are published to the host — Coolify's built-in proxy (Traefik) handles TLS termination and routes traffic to containers via the Docker network.
 
 ## URL model
 
@@ -15,20 +17,21 @@ Do not use `localhost` here in Coolify.
 
 ## Files
 
-- [`docker-compose.yml`](/Users/phumrin/Documents/cubis_project/db-centralize/docker/coolify/docker-compose.yml)
+- [`docker-compose.yml`](docker-compose.yml)
   Compose stack for Coolify.
-- [`.env.example`](/Users/phumrin/Documents/cubis_project/db-centralize/docker/coolify/.env.example)
+- [`.env.example`](.env.example)
   Environment template for Coolify.
 
 ## Recommended Coolify setup
 
 1. Create a new Docker Compose application in Coolify.
-2. Point it at [`docker/coolify/docker-compose.yml`](/Users/phumrin/Documents/cubis_project/db-centralize/docker/coolify/docker-compose.yml).
-3. Copy [`.env.example`](/Users/phumrin/Documents/cubis_project/db-centralize/docker/coolify/.env.example) to `.env` in the same folder and fill real values.
-4. In Coolify, attach:
-   - frontend domain to service `frontend`
-   - backend domain to service `backend`
-5. Keep the internal backend URL as `http://backend:8080`.
+2. Point it at `docker/coolify/docker-compose.yml`.
+3. Copy [`.env.example`](.env.example) to `.env` in the same folder and fill real values.
+4. In Coolify, assign domains to services:
+   - `frontend` service → your app domain (e.g. `app.example.com`)
+   - `backend` service → your api domain (e.g. `api.example.com`)
+5. Set `APP_PUBLIC_URL` and `API_PUBLIC_URL` to match the domains you assigned.
+6. Keep `INTERNAL_API_URL` as `http://backend:8080` (container-to-container).
 
 ## Required environment values
 
