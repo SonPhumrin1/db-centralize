@@ -12,34 +12,34 @@
   --font-mono:
     "IBM Plex Mono", "DM Mono", "SFMono-Regular", "SF Mono", Consolas,
     monospace;
-  --background: oklch(0.985 0.004 80);
-  --foreground: oklch(0.23 0.016 250);
-  --secondary: oklch(0.48 0.012 250);
-  --tertiary: oklch(0.62 0.01 250);
-  --surface: oklch(0.995 0.002 80);
-  --surface-raised: oklch(0.978 0.004 80);
-  --surface-subtle: oklch(0.964 0.004 80);
-  --accent: oklch(0.55 0.12 240);
-  --accent-strong: oklch(0.48 0.12 240);
-  --accent-foreground: oklch(0.985 0.004 80);
-  --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
-  --border: oklch(0.86 0.006 250 / 0.68);
+  --background: oklch(0.993 0.003 230);
+  --foreground: oklch(0.28 0.014 248);
+  --secondary: oklch(0.5 0.012 245);
+  --tertiary: oklch(0.67 0.01 245);
+  --surface: oklch(0.999 0.001 230);
+  --surface-raised: oklch(0.989 0.004 230);
+  --surface-subtle: oklch(0.978 0.005 230);
+  --accent: oklch(0.63 0.09 224);
+  --accent-strong: oklch(0.56 0.096 224);
+  --accent-foreground: oklch(0.993 0.003 230);
+  --accent-soft: color-mix(in oklab, var(--accent) 9%, transparent);
+  --border: oklch(0.9 0.006 240 / 0.72);
   --success: oklch(0.64 0.08 150);
   --warning: oklch(0.72 0.09 78);
   --danger: oklch(0.62 0.13 24);
   --sidebar: transparent;
-  --sidebar-panel: color-mix(in oklab, white 88%, var(--surface));
-  --sidebar-surface: color-mix(in oklab, white 80%, var(--surface-raised));
-  --sidebar-foreground: oklch(0.28 0.012 250);
-  --sidebar-muted: oklch(0.48 0.01 250);
-  --sidebar-subtle: oklch(0.61 0.008 250);
-  --sidebar-border: oklch(0.83 0.006 250 / 0.82);
-  --sidebar-highlight: color-mix(in oklab, white 78%, var(--accent) 22%);
-  --sidebar-hover: color-mix(in oklab, var(--accent) 12%, white 88%);
-  --sidebar-active: color-mix(in oklab, var(--accent) 18%, white 82%);
-  --sidebar-active-border: color-mix(in oklab, var(--accent) 32%, white 68%);
-  --sidebar-accent-line: color-mix(in oklab, var(--accent) 55%, white 45%);
-  --sidebar-shadow: 0 24px 60px rgba(16, 24, 40, 0.12);
+  --sidebar-panel: color-mix(in oklab, white 96%, var(--accent) 4%);
+  --sidebar-surface: color-mix(in oklab, white 92%, var(--accent) 8%);
+  --sidebar-foreground: oklch(0.3 0.012 248);
+  --sidebar-muted: oklch(0.52 0.01 245);
+  --sidebar-subtle: oklch(0.64 0.008 245);
+  --sidebar-border: oklch(0.87 0.005 245 / 0.84);
+  --sidebar-highlight: color-mix(in oklab, white 72%, var(--accent) 28%);
+  --sidebar-hover: color-mix(in oklab, white 90%, var(--accent) 10%);
+  --sidebar-active: color-mix(in oklab, white 85%, var(--accent) 15%);
+  --sidebar-active-border: color-mix(in oklab, white 74%, var(--accent) 26%);
+  --sidebar-accent-line: color-mix(in oklab, white 52%, var(--accent) 48%);
+  --sidebar-shadow: 0 24px 56px rgba(148, 163, 184, 0.18);
   --ring: color-mix(in oklab, var(--accent) 34%, white);
   --radius: 10px;
 }
@@ -117,12 +117,12 @@
     background-image:
       radial-gradient(
         circle at top left,
-        color-mix(in oklab, var(--accent) 5%, transparent),
-        transparent 28%
+        color-mix(in oklab, var(--accent) 4%, transparent),
+        transparent 32%
       ),
       linear-gradient(
         180deg,
-        color-mix(in oklab, var(--surface) 94%, var(--background)) 0%,
+        color-mix(in oklab, white 88%, var(--background)) 0%,
         var(--background) 100%
       );
     transition:
@@ -139,17 +139,17 @@
     background-image:
       linear-gradient(
         to right,
-        color-mix(in oklab, var(--border) 58%, transparent) 1px,
+        color-mix(in oklab, var(--border) 48%, transparent) 1px,
         transparent 1px
       ),
       linear-gradient(
         to bottom,
-        color-mix(in oklab, var(--border) 58%, transparent) 1px,
+        color-mix(in oklab, var(--border) 48%, transparent) 1px,
         transparent 1px
       );
     background-size: 24px 24px;
     mask-image: linear-gradient(180deg, black, transparent 72%);
-    opacity: 0.32;
+    opacity: 0.18;
     z-index: -1;
   }
 
@@ -392,7 +392,6 @@
     padding-right: 0.75rem;
   }
 }
-
 
 
 

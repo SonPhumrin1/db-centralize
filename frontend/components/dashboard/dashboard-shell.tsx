@@ -16,8 +16,8 @@ import {
   type SidebarMode,
 } from "@/lib/sidebar-preferences"
 
-const collapsedSidebarWidth = 88
-const expandedSidebarWidth = 232
+const collapsedSidebarWidth = 80
+const expandedSidebarWidth = 220
 
 export function DashboardShell({
   children,
