@@ -28,6 +28,7 @@ export function DashboardSidebar({
   role,
   platformName,
   isAdmin,
+  sidebarPanelWidth,
   sidebarWidth,
 }: {
   expanded: boolean
@@ -41,19 +42,21 @@ export function DashboardSidebar({
   role: string
   platformName: string
   isAdmin: boolean
+  sidebarPanelWidth: number
   sidebarWidth: number
 }) {
   const displayName = username.trim() || "operator"
 
   return (
     <aside
-      className="relative hidden md:block md:h-svh md:shrink-0 md:self-start md:transition-[width] md:duration-200"
+      className="relative hidden md:block md:h-svh md:shrink-0 md:self-start md:transition-[width] md:duration-300 md:ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{ width: `${sidebarWidth}px` }}
     >
       <div
         className={cn(
-          "mx-0 my-3 flex h-[calc(100svh-24px)] overflow-hidden rounded-[24px] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl"
+          "my-3 ml-3 flex h-[calc(100svh-24px)] overflow-hidden rounded-[24px] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl transition-[width,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
         )}
+        style={{ width: `${sidebarPanelWidth}px` }}
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
             onKeyboardFocusChange(false)
@@ -74,7 +77,7 @@ export function DashboardSidebar({
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             className={cn(
-              "flex items-center border-b border-[color:var(--sidebar-border)]",
+              "flex items-center border-b border-[color:var(--sidebar-border)] transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
               expanded ? "justify-between px-4 py-4" : "justify-center px-3 py-4"
             )}
           >
@@ -85,16 +88,20 @@ export function DashboardSidebar({
               >
                 DP
               </div>
-              {expanded ? (
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-[10px] tracking-[0.14em] text-[color:var(--sidebar-subtle)] uppercase">
-                    {platformName}
-                  </p>
-                  <p className="mt-1 truncate text-sm font-medium text-[color:var(--sidebar-foreground)]">
-                    Project Overview
-                  </p>
-                </div>
-              ) : null}
+              <div
+                aria-hidden={!expanded}
+                className={cn(
+                  "min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  expanded ? "max-w-40 opacity-100 translate-x-0" : "max-w-0 opacity-0 -translate-x-1"
+                )}
+              >
+                <p className="truncate font-mono text-[10px] tracking-[0.14em] text-[color:var(--sidebar-subtle)] uppercase">
+                  {platformName}
+                </p>
+                <p className="mt-1 truncate text-sm font-medium text-[color:var(--sidebar-foreground)]">
+                  Project Overview
+                </p>
+              </div>
             </div>
 
             {mode === "manual" ? (
@@ -117,11 +124,21 @@ export function DashboardSidebar({
             ) : null}
           </div>
 
-          <div className={cn("flex-1", expanded ? "px-3 py-4" : "px-2 py-4")}>
+          <div
+            className={cn(
+              "flex-1 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              expanded ? "px-3 py-4" : "px-2 py-4"
+            )}
+          >
             <DashboardNav collapsed={!expanded} isAdmin={isAdmin} tone="sidebar" />
           </div>
 
-          <div className={cn("border-t border-[color:var(--sidebar-border)]", expanded ? "px-3 py-3" : "px-2 py-3")}>
+          <div
+            className={cn(
+              "border-t border-[color:var(--sidebar-border)] transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              expanded ? "px-3 py-3" : "px-2 py-3"
+            )}
+          >
             {expanded ? (
               <>
                 <div className="flex items-center justify-between gap-2">

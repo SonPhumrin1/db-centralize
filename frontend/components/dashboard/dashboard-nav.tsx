@@ -66,12 +66,12 @@ export function DashboardNav({
         const link = (
           <Link
             className={cn(
-              "inline-flex items-center gap-3 text-sm transition-colors",
+              "inline-flex items-center overflow-hidden text-sm transition-[padding,gap,background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
               orientation === "horizontal" ? "shrink-0" : "w-full",
               orientation === "vertical" &&
                 (collapsed
-                  ? "size-9 justify-center rounded-lg px-0 py-0"
-                  : "rounded-lg px-3 py-2.5"),
+                  ? "size-9 justify-center gap-0 rounded-lg px-0 py-0"
+                  : "gap-3 rounded-lg px-3 py-2.5"),
               isActive
                 ? tone === "sidebar"
                   ? "bg-[color:var(--sidebar-active)] text-[color:var(--sidebar-foreground)] shadow-[inset_0_0_0_1px_var(--sidebar-active-border)]"
@@ -83,11 +83,16 @@ export function DashboardNav({
             href={item.href}
           >
             <Icon className="size-4 shrink-0" />
-            {!(orientation === "vertical" && collapsed) ? (
-              <span>{item.label}</span>
-            ) : (
-              <span className="sr-only">{item.label}</span>
-            )}
+            <span
+              className={cn(
+                "overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                orientation === "vertical" && collapsed
+                  ? "max-w-0 opacity-0 -translate-x-2"
+                  : "max-w-32 opacity-100 translate-x-0"
+              )}
+            >
+              {item.label}
+            </span>
           </Link>
         )
 
