@@ -62,6 +62,8 @@ func main() {
 	telegramIntegrationUsecase.BindPipelineRunner(pipelineUsecase)
 	pipelineHandler := handler.NewPipelineHandler(pipelineUsecase)
 	telegramIntegrationHandler := handler.NewTelegramIntegrationHandler(telegramIntegrationUsecase)
+	authUsecase := usecase.NewAuthUsecase(gormDB, userRepo)
+	authHandler := handler.NewAuthHandler(authUsecase)
 	adminUserUsecase := usecase.NewAdminUserUsecase(gormDB, userRepo)
 	adminUserHandler := handler.NewAdminUserHandler(adminUserUsecase)
 	systemSettingsUsecase := usecase.NewSystemSettingsUsecase(gormDB, systemSettingsRepo, userRepo, cfg.BootstrapUsername)
@@ -79,6 +81,9 @@ func main() {
 		AllowCredentials: true,
 	}))
 	app.Get("/health", healthHandler)
+	app.Post("/api/v1/auth/login", authHandler.Login)
+	app.Get("/api/v1/auth/session", authHandler.Session)
+	app.Post("/api/v1/auth/logout", authHandler.Logout)
 	registerInvokeRoute(app, "/invoke/:publicID", gormDB, endpointHandler)
 	registerInvokeRoute(app, "/api/v1/invoke/:publicID", gormDB, endpointHandler)
 

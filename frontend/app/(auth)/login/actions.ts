@@ -1,12 +1,29 @@
 "use server"
 
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
-
-import { auth } from "@/lib/auth"
 
 export type LoginFormState = {
   error: string | null
+}
+
+type LoginResponse = {
+  token: string
+  expiresAt: string
+}
+
+function getBackendBaseUrl() {
+  return (
+    process.env.INTERNAL_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://localhost:8080"
+  )
+}
+
+function useSecureSessionCookie() {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.BETTER_AUTH_URL ?? ""
+  return appUrl.startsWith("https://")
 }
 
 export async function loginWithUsername(
@@ -23,29 +40,57 @@ export async function loginWithUsername(
     }
   }
 
-  const result = await auth.api.signInUsername({
-    body: {
+  const requestHeaders = await headers()
+  const response = await fetch(`${getBackendBaseUrl()}/api/v1/auth/login`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      "user-agent": requestHeaders.get("user-agent") ?? "",
+    },
+    body: JSON.stringify({
       username,
       password,
       rememberMe: true,
-    },
-    headers: await headers(),
-    asResponse: true,
+    }),
   })
 
-  if (!result.ok) {
+  if (!response.ok) {
     return {
       error: "Invalid username or password.",
     }
   }
 
+  const result = (await response.json()) as LoginResponse
+  const cookieStore = await cookies()
+  cookieStore.set("better-auth.session_token", result.token, {
+    expires: new Date(result.expiresAt),
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure: useSecureSessionCookie(),
+  })
+
   redirect(nextPath.startsWith("/") ? nextPath : "/dashboard")
 }
 
 export async function signOut() {
-  await auth.api.signOut({
-    headers: await headers(),
-  })
+  const requestHeaders = await headers()
+  const cookieHeader = requestHeaders.get("cookie")
+  if (cookieHeader) {
+    await fetch(`${getBackendBaseUrl()}/api/v1/auth/logout`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        cookie: cookieHeader,
+      },
+    }).catch(() => undefined)
+  }
+
+  const cookieStore = await cookies()
+  cookieStore.delete("better-auth.session_token")
+  cookieStore.delete("__Secure-better-auth.session_token")
+  cookieStore.delete("__Host-better-auth.session_token")
 
   redirect("/login")
 }

@@ -22,9 +22,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="flex min-h-svh items-center justify-center px-5 py-8 md:px-8">
       <div className="w-full max-w-[380px]">
-        <section className="rounded-[24px] border border-border bg-surface px-6 py-7 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+        <section className="bg-surface rounded-[24px] border border-border px-6 py-7 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
           <div className="flex justify-center">
-            <div className="flex size-11 items-center justify-center rounded-2xl border border-border bg-surface-subtle text-foreground">
+            <div className="bg-surface-subtle flex size-11 items-center justify-center rounded-2xl border border-border text-foreground">
               <LogIn className="size-4" />
             </div>
           </div>
@@ -44,8 +44,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
 
           <div className="mt-6 border-t border-border pt-4 text-center">
-            <p className="page-label">Local credentials</p>
-            <p className="mt-2 font-mono text-sm text-foreground">root / 123</p>
+            <p className="page-label">Bootstrap credentials</p>
+            <p className="mt-2 text-sm text-secondary">
+              Use the root username and password configured for this
+              environment.
+            </p>
           </div>
         </section>
       </div>
