@@ -52,7 +52,7 @@ export function DashboardSidebar({
     >
       <div
         className={cn(
-          "mx-0 my-3 flex h-[calc(100svh-24px)] overflow-hidden rounded-[24px] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl before:absolute before:inset-y-6 before:left-0 before:w-px before:bg-[color:var(--sidebar-accent-line)]"
+          "mx-0 my-3 flex h-[calc(100svh-24px)] overflow-hidden rounded-[24px] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl"
         )}
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
