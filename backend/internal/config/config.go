@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // Config stores backend environment configuration values.
@@ -22,14 +24,35 @@ type Config struct {
 
 // Load reads required environment variables and validates startup prerequisites.
 func Load() (*Config, error) {
+	v := newViper()
+	return loadFromViper(v)
+}
+
+func newViper() *viper.Viper {
+	v := viper.New()
+	v.SetDefault("PORT", "8080")
+
+	for _, filename := range []string{".env.local", ".env"} {
+		if _, err := os.Stat(filename); err == nil {
+			v.SetConfigFile(filename)
+			v.SetConfigType("env")
+			_ = v.MergeInConfig()
+		}
+	}
+
+	v.AutomaticEnv()
+	return v
+}
+
+func loadFromViper(v *viper.Viper) (*Config, error) {
 	cfg := &Config{
-		DatabaseURL:       os.Getenv("DATABASE_URL"),
-		RedisURL:          os.Getenv("REDIS_URL"),
-		EncryptionKey:     os.Getenv("ENCRYPTION_KEY"),
-		Port:              os.Getenv("PORT"),
-		BootstrapUsername: os.Getenv("BOOTSTRAP_ROOT_USERNAME"),
-		BootstrapPassword: os.Getenv("BOOTSTRAP_ROOT_PASSWORD"),
-		AppURL:            firstNonEmpty(os.Getenv("NEXT_PUBLIC_APP_URL"), os.Getenv("BETTER_AUTH_URL")),
+		DatabaseURL:       strings.TrimSpace(v.GetString("DATABASE_URL")),
+		RedisURL:          strings.TrimSpace(v.GetString("REDIS_URL")),
+		EncryptionKey:     strings.TrimSpace(v.GetString("ENCRYPTION_KEY")),
+		Port:              strings.TrimSpace(v.GetString("PORT")),
+		BootstrapUsername: strings.TrimSpace(v.GetString("BOOTSTRAP_ROOT_USERNAME")),
+		BootstrapPassword: strings.TrimSpace(v.GetString("BOOTSTRAP_ROOT_PASSWORD")),
+		AppURL:            firstNonEmpty(v.GetString("NEXT_PUBLIC_APP_URL"), v.GetString("BETTER_AUTH_URL")),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -49,10 +72,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("ENCRYPTION_KEY must decode to 32 bytes, got %d", len(keyBytes))
 	}
 	cfg.EncryptionKeyRaw = keyBytes
-
-	if cfg.Port == "" {
-		cfg.Port = "8080"
-	}
 
 	if cfg.BootstrapUsername == "" {
 		return nil, fmt.Errorf("BOOTSTRAP_ROOT_USERNAME is required")

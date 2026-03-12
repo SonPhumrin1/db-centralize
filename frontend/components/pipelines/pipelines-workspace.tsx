@@ -61,6 +61,12 @@ function totalRuns(pipeline: PipelineSummary) {
   return pipeline.lastRanAt ? 1 + (pipeline.id % 9) : 0
 }
 
+function shouldIgnoreRowNavigation(target: EventTarget | null) {
+  return target instanceof Element
+    ? Boolean(target.closest("button, a, input, textarea, select, [data-row-ignore-navigation='true']"))
+    : false
+}
+
 export function PipelinesWorkspace() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -172,7 +178,17 @@ export function PipelinesWorkspace() {
               : null}
 
             {!pipelinesQuery.isLoading && summaries.map((pipeline) => (
-              <tr key={pipeline.id} className="data-row">
+              <tr
+                key={pipeline.id}
+                className="data-row cursor-pointer"
+                onClick={(event) => {
+                  if (shouldIgnoreRowNavigation(event.target)) {
+                    return
+                  }
+
+                  router.push(`/dashboard/pipelines/${pipeline.id}/canvas`)
+                }}
+              >
                 <td className="font-medium">{pipeline.name}</td>
                 <td className="mono-value text-secondary">{pipeline.nodes}</td>
                 <td>
@@ -193,7 +209,12 @@ export function PipelinesWorkspace() {
                         Open Canvas
                       </Link>
                     </Button>
-                    <Button onClick={() => setPipelinePendingDelete(pipeline)} size="sm" type="button" variant="ghost">
+                    <Button
+                      onClick={() => setPipelinePendingDelete(pipeline)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
                       <Trash2 className="size-4" />
                       Delete
                     </Button>

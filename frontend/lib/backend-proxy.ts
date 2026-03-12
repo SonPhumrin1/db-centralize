@@ -19,12 +19,16 @@ export async function forwardToBackend({
   const headers = new Headers()
   const cookie = request.headers.get("cookie")
   const contentType = request.headers.get("content-type")
+  const authorization = request.headers.get("authorization")
 
   if (cookie) {
     headers.set("cookie", cookie)
   }
   if (contentType) {
     headers.set("content-type", contentType)
+  }
+  if (authorization) {
+    headers.set("authorization", authorization)
   }
 
   const resolvedMethod = method ?? request.method

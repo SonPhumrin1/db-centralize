@@ -54,6 +54,10 @@ Services:
 - Postgres: internal `postgres:5432`
 - Redis: internal `redis:6379`
 
+### Option 1b: Coolify deployment
+
+Use the dedicated Coolify bundle in [docker/coolify](/Users/phumrin/Documents/cubis_project/db-centralize/docker/coolify/README.md). Do not reuse the local Docker env file for deployment.
+
 ### Option 2: Run services locally
 
 Backend:
@@ -117,12 +121,12 @@ Change that password in Dashboard → Settings after first boot.
 
 ## Calling an Endpoint with curl
 
-Replace `<slug>` with the endpoint slug shown in the dashboard.
+Replace `<public-id>` with the opaque endpoint ID shown in the dashboard.
 
 ```bash
 curl \
   -H "Authorization: Basic $(printf 'root:123' | base64)" \
-  "http://localhost:8080/invoke/<slug>"
+  "http://localhost:8080/api/v1/invoke/<public-id>"
 ```
 
 Example response:
@@ -139,3 +143,4 @@ Example response:
 - If Better Auth fails during frontend startup, check `DATABASE_URL`, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL`.
 - If dashboard pages load but platform data is empty, verify `NEXT_PUBLIC_API_URL` matches the runtime mode you are using.
 - If source tests fail in Docker Compose, remember the backend container resolves internal services by compose service name, not `localhost`.
+- If you deploy on Coolify, use the separate [docker/coolify](/Users/phumrin/Documents/cubis_project/db-centralize/docker/coolify/README.md) config instead of `docker/local`.

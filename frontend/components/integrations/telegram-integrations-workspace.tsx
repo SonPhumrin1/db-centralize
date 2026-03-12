@@ -327,7 +327,10 @@ export function TelegramIntegrationsWorkspace() {
 
         <div className="space-y-5">
           <section className="panel">
-            <div className="panel-body space-y-4">
+            <form
+              className="panel-body space-y-4"
+              onSubmit={(event) => event.preventDefault()}
+            >
               {selectedIntegration ? (
                 <div className="rounded-[8px] border border-border bg-surface-raised px-4 py-3 text-sm text-secondary">
                   Stored token stays hidden after save. Leave the token field empty to keep the
@@ -401,7 +404,7 @@ export function TelegramIntegrationsWorkspace() {
                   </p>
                 </div>
               ) : null}
-            </div>
+            </form>
           </section>
 
           <section className="grid gap-4 md:grid-cols-3">

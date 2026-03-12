@@ -296,7 +296,10 @@ export function SourcesWorkspace() {
               Close
             </Button>
           </div>
-          <div className="panel-body space-y-4">
+          <form
+            className="panel-body space-y-4"
+            onSubmit={(event) => event.preventDefault()}
+          >
             <div className="grid gap-4 xl:grid-cols-2">
               <Field label="Source name">
                 <Input
@@ -350,7 +353,7 @@ export function SourcesWorkspace() {
                 {createMutation.isPending ? "Saving..." : "Save source"}
               </Button>
             </div>
-          </div>
+          </form>
         </section>
       ) : null}
 
@@ -765,6 +768,5 @@ function serializeHeaders(headers?: Record<string, string>) {
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n")
 }
-
 
 

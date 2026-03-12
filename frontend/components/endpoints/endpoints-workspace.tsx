@@ -112,6 +112,12 @@ function buildCurlPreview(method: string, headerValue: string, invokeUrl: string
   return `curl -X ${method} -H "${headerValue}" "${invokeUrl}"`
 }
 
+function shouldIgnoreRowToggle(target: EventTarget | null) {
+  return target instanceof Element
+    ? Boolean(target.closest("button, a, input, textarea, [role='switch'], [data-row-ignore-toggle='true']"))
+    : false
+}
+
 function EndpointStatusBadge({ isActive }: { isActive: boolean }) {
   return (
     <Badge
@@ -324,20 +330,30 @@ export function EndpointsWorkspace({ username }: { username: string }) {
                 : `Authorization: Basic <base64(${username}:your-password)>`
               const invokeUrl = endpointUrl(endpoint.publicId)
               const curlPreview = buildCurlPreview(invokeMethod, headerValue, invokeUrl)
+              const toggleHelper = () => {
+                setHelperEndpointId((current) => current === endpoint.id ? null : endpoint.id)
+              }
 
               return (
                 <Fragment key={endpoint.id}>
                   <TableRow
                     className={cn(
-                      "border-border transition-colors hover:bg-[color:color-mix(in_oklab,var(--foreground)_2.5%,transparent)]",
+                      "cursor-pointer border-border transition-colors hover:bg-[color:color-mix(in_oklab,var(--foreground)_2.5%,transparent)]",
                       helperOpen &&
                         "bg-[color:color-mix(in_oklab,var(--accent)_7%,transparent)] shadow-[inset_2px_0_0_0_var(--accent-strong)]"
                     )}
+                    onClick={(event) => {
+                      if (shouldIgnoreRowToggle(event.target)) {
+                        return
+                      }
+
+                      toggleHelper()
+                    }}
                   >
                     <TableCell className="px-3">
                       <button
                         className="flex items-center gap-2 font-mono text-sm text-foreground"
-                        onClick={() => setHelperEndpointId((current) => current === endpoint.id ? null : endpoint.id)}
+                        onClick={toggleHelper}
                         type="button"
                       >
                         <span className="break-all text-left">{endpoint.publicId}</span>
@@ -382,7 +398,7 @@ export function EndpointsWorkspace({ username }: { username: string }) {
                           </TooltipContent>
                         </Tooltip>
                         <Button
-                          onClick={() => setHelperEndpointId((current) => current === endpoint.id ? null : endpoint.id)}
+                          onClick={toggleHelper}
                           size="sm"
                           type="button"
                           variant="ghost"

@@ -15,14 +15,22 @@ services:
 
   redis:
     image: redis:7-alpine
+    volumes:
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
 
   backend:
     build: ./backend
-    ports:
-      - "8080:8080"
-    env_file: .env
+    environment:
+      - BOOTSTRAP_ROOT_USERNAME=${BOOTSTRAP_ROOT_USERNAME}
+      - BOOTSTRAP_ROOT_PASSWORD=${BOOTSTRAP_ROOT_PASSWORD}
+      - APP_URL=${APP_URL}
+      - PORT=${PORT:-8080}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      retries: 5
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,9 +39,8 @@ services:
 
   frontend:
     build: ./frontend
-    ports:
-      - "3000:3000"
-    env_file: .env
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
 

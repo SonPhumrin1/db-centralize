@@ -307,8 +307,8 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
       ) : null}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="overflow-hidden rounded-[10px] border border-border bg-[color:oklch(0.17_0_0)] text-white">
-          <div className="border-b border-white/10 px-4 py-3 text-sm text-white/70">
+        <div className="overflow-hidden rounded-[10px] border border-[color:var(--canvas-border)] bg-[color:var(--canvas-surface)] text-[color:var(--canvas-foreground)]">
+          <div className="border-b border-[color:var(--canvas-border)] px-4 py-3 text-sm text-[color:color-mix(in_oklab,var(--canvas-foreground)_72%,transparent)]">
             Full-page canvas. Save before running to persist graph edits.
           </div>
           <div className="grid-dots h-[76vh]">
@@ -323,9 +323,13 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
               onNodesChange={onNodesChange}
               onPaneClick={() => selectNode(null)}
             >
-              <MiniMap className="!bg-black/40" />
-              <Controls className="!bg-black/50" />
-              <Background color="rgba(255,255,255,0.12)" gap={18} size={1.3} variant={BackgroundVariant.Dots} />
+              <MiniMap
+                className="!border !border-[color:var(--canvas-border)] !bg-[color:var(--canvas-control-surface)]"
+                maskColor="transparent"
+                nodeColor="var(--accent)"
+              />
+              <Controls className="!border !border-[color:var(--canvas-border)] !bg-[color:var(--canvas-control-surface)] [&>button]:!border-b-[color:var(--canvas-border)] [&>button]:!bg-transparent [&>button]:!text-[color:var(--canvas-foreground)]" />
+              <Background color="var(--canvas-dot)" gap={18} size={1.3} variant={BackgroundVariant.Dots} />
             </ReactFlow>
           </div>
         </div>

@@ -35,12 +35,12 @@ export function PipelineNode({ data: rawData, selected }: NodeProps) {
       {data.kind !== "output" ? <Handle position={Position.Right} type="source" /> : null}
 
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 text-secondary">
+        <span className="mt-0.5 text-[color:color-mix(in_oklab,var(--foreground)_62%,var(--accent))]">
           <Icon className="size-4" />
         </span>
         <div className="space-y-1">
           <p className="text-sm font-medium">{data.label}</p>
-          <p className="max-w-[150px] text-xs leading-5 text-secondary">
+          <p className="max-w-[150px] text-xs leading-5 text-[color:color-mix(in_oklab,var(--foreground)_68%,transparent)]">
             {summarizeNode({
               id: "",
               type: "pipelineNode",

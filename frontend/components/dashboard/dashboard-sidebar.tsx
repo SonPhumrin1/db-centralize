@@ -49,7 +49,7 @@ export function DashboardSidebar({
 
   return (
     <aside
-      className="relative hidden md:block md:h-svh md:shrink-0 md:self-start md:transition-[width] md:duration-300 md:ease-[cubic-bezier(0.22,1,0.36,1)]"
+      className="relative hidden md:sticky md:top-0 md:block md:h-svh md:shrink-0 md:self-start md:transition-[width] md:duration-300 md:ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{ width: `${sidebarWidth}px` }}
     >
       <div

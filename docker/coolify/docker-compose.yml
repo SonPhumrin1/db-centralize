@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16.8
+    environment:
+      POSTGRES_DB: dataplatform
+      POSTGRES_USER: dp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - dataplatform-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dp -d dataplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    volumes:
+      - dataplatform-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    build:
+      context: ../../backend
+    env_file:
+      - ./.env
+    environment:
+      PORT: ${API_PORT:-8080}
+      BETTER_AUTH_URL: ${APP_PUBLIC_URL}
+      NEXT_PUBLIC_APP_URL: ${APP_PUBLIC_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "${API_PORT:-8080}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${API_PORT:-8080}/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build:
+      context: ../../frontend
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+        BETTER_AUTH_URL: ${APP_PUBLIC_URL}
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL}
+        INTERNAL_API_URL: ${INTERNAL_API_URL}
+    env_file:
+      - ./.env
+    environment:
+      PORT: ${FRONTEND_PORT:-3000}
+      BETTER_AUTH_URL: ${APP_PUBLIC_URL}
+      NEXT_PUBLIC_APP_URL: ${APP_PUBLIC_URL}
+      NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL}
+      INTERNAL_API_URL: ${INTERNAL_API_URL}
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - "${FRONTEND_PORT:-3000}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then((response) => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  dataplatform-pgdata:
+  dataplatform-redisdata:

@@ -3,6 +3,7 @@
 import { useState } from "react"
 
 import { PageHeader } from "@/components/dashboard/platform-ui"
+import { SidebarPreferencesCard } from "@/components/settings/sidebar-preferences-card"
 import { SystemSettingsWorkspace } from "@/components/settings/system-settings-workspace"
 import { UserManagementWorkspace } from "@/components/settings/user-management-workspace"
 
@@ -24,6 +25,7 @@ export function AdminSettingsWorkspace({
       />
 
       <SystemSettingsWorkspace onPlatformNameChange={setPlatformName} />
+      <SidebarPreferencesCard />
       <UserManagementWorkspace currentUserId={currentUserId} />
     </div>
   )

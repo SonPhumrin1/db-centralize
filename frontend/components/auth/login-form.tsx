@@ -56,9 +56,8 @@ export function LoginForm({ nextPath }: LoginFormProps) {
         <InlineBanner tone="error">{state.error}</InlineBanner>
       ) : null}
 
-      <Button className="w-full justify-between" disabled={isPending} type="submit">
-        <span>{isPending ? "Signing in..." : "Sign in"}</span>
-        <span className="mono-value text-[inherit]">access</span>
+      <Button className="w-full justify-center" disabled={isPending} type="submit">
+        {isPending ? "Signing in..." : "Sign in"}
       </Button>
     </form>
   )
