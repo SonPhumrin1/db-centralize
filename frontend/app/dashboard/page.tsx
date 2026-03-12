@@ -85,7 +85,7 @@ function buildActivityFeed(data: DashboardData) {
     items.push({
       at: endpoint.createdAt,
       label: "Endpoint",
-      detail: `${endpoint.slug} ${endpoint.isActive ? "active" : "draft"}`,
+      detail: `${endpoint.publicId.slice(0, 8)} ${endpoint.isActive ? "active" : "draft"}`,
     })
   }
 

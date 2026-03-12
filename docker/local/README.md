@@ -28,6 +28,16 @@ Login credentials:
 
 Use the browser only for `localhost:3000`. Inside datasource forms, use Docker service names, not `localhost`.
 
+## Browser State For Visual Checks
+
+When you compare screenshots or automate the UI with Playwright, start from a clean browser profile or reset the sidebar preference keys first.
+
+- clear `dashboard-sidebar-mode`
+- clear `dashboard-sidebar-manual-collapsed`
+- choose light or dark mode intentionally before comparing visuals
+
+Fresh browser state starts with the desktop sidebar in auto mode. If you reuse a browser profile, persisted theme and sidebar settings can make Docker-local screenshots look different from a clean test run.
+
 ## Why Service Names Matter
 
 The app runs inside Docker. From that container:
@@ -628,6 +638,32 @@ curl -X PATCH http://localhost:8090/orders/5003 \
 ```bash
 curl -X DELETE http://localhost:8090/drafts/9001
 ```
+
+## Reset App Authored Data
+
+Use this when you want to wipe authored runtime data from the app database but keep the user account, auth records, and settings.
+
+From `docker/local` run:
+
+```bash
+docker compose exec postgres psql -U dp -d dataplatform -c "TRUNCATE endpoints, pipeline_runs, pipelines, queries, data_sources, telegram_integrations RESTART IDENTITY;"
+```
+
+This removes:
+
+- data sources
+- queries
+- endpoints
+- pipelines
+- pipeline runs
+- telegram integrations
+
+This keeps:
+
+- users
+- sessions
+- accounts
+- system settings
 
 ## Pipeline Notes
 

@@ -118,6 +118,9 @@ func TestQueryAndEndpointUsecasesWithRESTSource(t *testing.T) {
 	if err := db.Where("query_id = ?", query.ID).First(&endpoint).Error; err != nil {
 		t.Fatalf("load endpoint: %v", err)
 	}
+	if endpoint.PublicID == "" {
+		t.Fatalf("expected endpoint public id to be generated")
+	}
 
 	rows, err := queryUC.Run(ctx, query.ID, owner.ID)
 	if err != nil {

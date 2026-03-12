@@ -19,6 +19,7 @@ import {
   restAuthOptions,
   sourceTypeOptions,
 } from "@/lib/datasources"
+import { formatUtcDateTime } from "@/lib/formatting"
 import type { SavedQuery } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
@@ -454,7 +455,9 @@ export function SourcesWorkspace() {
                                 <span className="mono-value">{summarizeHost(source)}</span>
                               </DetailField>
                               <DetailField label="Last tested">
-                                <span className="mono-value">{source.lastTestedAt ? new Date(source.lastTestedAt).toLocaleString() : "Never"}</span>
+                                <span className="mono-value">
+                                  {formatUtcDateTime(source.lastTestedAt, { fallback: "Never" })}
+                                </span>
                               </DetailField>
                               <DetailField label="Credentials hint">
                                 <span className="text-sm text-secondary">
@@ -762,7 +765,6 @@ function serializeHeaders(headers?: Record<string, string>) {
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n")
 }
-
 
 
 

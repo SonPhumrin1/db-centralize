@@ -12,7 +12,7 @@ import (
 type EndpointRepository interface {
 	FindAll(ctx context.Context, userID uint) ([]model.Endpoint, error)
 	FindByID(ctx context.Context, id, userID uint) (*model.Endpoint, error)
-	FindBySlug(ctx context.Context, slug string) (*model.Endpoint, error)
+	FindByPublicID(ctx context.Context, publicID string) (*model.Endpoint, error)
 	FindByPipelineID(ctx context.Context, pipelineID, userID uint) (*model.Endpoint, error)
 	Create(ctx context.Context, endpoint *model.Endpoint) error
 	Update(ctx context.Context, endpoint *model.Endpoint) error
@@ -35,6 +35,8 @@ func (r *endpointRepository) FindAll(ctx context.Context, userID uint) ([]model.
 	if err := r.db.WithContext(ctx).
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
+		Preload("Query").
+		Preload("Query.DataSource").
 		Find(&endpoints).Error; err != nil {
 		return nil, fmt.Errorf("find endpoints: %w", err)
 	}
@@ -56,10 +58,10 @@ func (r *endpointRepository) FindByID(ctx context.Context, id, userID uint) (*mo
 	return &endpoint, nil
 }
 
-func (r *endpointRepository) FindBySlug(ctx context.Context, slug string) (*model.Endpoint, error) {
+func (r *endpointRepository) FindByPublicID(ctx context.Context, publicID string) (*model.Endpoint, error) {
 	var endpoint model.Endpoint
 	if err := r.db.WithContext(ctx).
-		Where("slug = ?", slug).
+		Where("public_id = ?", publicID).
 		First(&endpoint).Error; err != nil {
 		return nil, err
 	}

@@ -158,6 +158,9 @@ func TestEndpointRepositoryOwnershipScopes(t *testing.T) {
 	if err := repo.Create(ctx, endpoint); err != nil {
 		t.Fatalf("create endpoint: %v", err)
 	}
+	if endpoint.PublicID == "" {
+		t.Fatalf("expected endpoint public id to be generated")
+	}
 
 	pipelineEndpoint := &model.Endpoint{
 		UserID:     owner.ID,
@@ -173,6 +176,9 @@ func TestEndpointRepositoryOwnershipScopes(t *testing.T) {
 
 	if _, err := repo.FindByID(ctx, endpoint.ID, other.ID); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected forbidden find, got %v", err)
+	}
+	if loaded, err := repo.FindByPublicID(ctx, endpoint.PublicID); err != nil || loaded.ID != endpoint.ID {
+		t.Fatalf("expected public id lookup to find endpoint, err=%v endpoint=%#v", err, loaded)
 	}
 	if _, err := repo.FindByPipelineID(ctx, pipeline.ID, other.ID); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected forbidden pipeline lookup, got %v", err)

@@ -159,7 +159,16 @@ func TestUserIsolationRoutesReturnForbidden(t *testing.T) {
 		{
 			name:   "invoke foreign endpoint",
 			method: http.MethodGet,
-			path:   fmt.Sprintf("/invoke/%s", fixtures.endpoint.Slug),
+			path:   fmt.Sprintf("/invoke/%s", fixtures.endpoint.PublicID),
+			headers: map[string]string{
+				fiber.HeaderAuthorization: basicAuth(fixtures.userB.Username, fixtures.userBPassword),
+			},
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:   "invoke foreign endpoint through api prefix",
+			method: http.MethodGet,
+			path:   fmt.Sprintf("/api/v1/invoke/%s", fixtures.endpoint.PublicID),
 			headers: map[string]string{
 				fiber.HeaderAuthorization: basicAuth(fixtures.userB.Username, fixtures.userBPassword),
 			},
@@ -181,6 +190,7 @@ type isolationFixtures struct {
 	userA         *model.User
 	userB         *model.User
 	userBPassword string
+	userAPassword string
 	userASession  *model.Session
 	userBSession  *model.Session
 	dataSource    *model.DataSource
@@ -253,13 +263,14 @@ func newIsolationApp(t *testing.T, gormDB *gorm.DB) (*fiber.App, isolationFixtur
 		t.Fatalf("create endpoint: %v", err)
 	}
 
-	app := fiber.New()
-	api := app.Group("/api/v1", middleware.SessionAuthMiddleware(gormDB))
-
 	dataSourceHandler := NewDataSourceHandler(dataSourceUC)
 	queryHandler := NewQueryHandler(queryUC)
 	endpointHandler := NewEndpointHandler(endpointUC)
 	pipelineHandler := NewPipelineHandler(pipelineUC)
+
+	app := fiber.New()
+	registerTestInvokeRoutes(app, gormDB, endpointHandler)
+	api := app.Group("/api/v1", middleware.SessionAuthMiddleware(gormDB))
 
 	api.Get("/datasources/:id", dataSourceHandler.Get)
 	api.Delete("/datasources/:id", dataSourceHandler.Delete)
@@ -280,18 +291,39 @@ func newIsolationApp(t *testing.T, gormDB *gorm.DB) (*fiber.App, isolationFixtur
 	api.Delete("/pipelines/:id", pipelineHandler.Delete)
 	api.Post("/pipelines/:id/run", pipelineHandler.Run)
 
-	app.Get("/invoke/:slug", middleware.InvokeAuthMiddleware(gormDB), endpointHandler.Invoke)
-
 	return app, isolationFixtures{
 		userA:         userA,
 		userB:         userB,
 		userBPassword: userBPassword,
+		userAPassword: userAPassword,
 		userASession:  userASession,
 		userBSession:  userBSession,
 		dataSource:    dataSource,
 		query:         query,
 		endpoint:      endpoint,
 		pipeline:      pipeline,
+	}
+}
+
+func registerTestInvokeRoutes(app *fiber.App, gormDB *gorm.DB, endpointHandler *EndpointHandler) {
+	for _, method := range []string{fiber.MethodGet, fiber.MethodPost, fiber.MethodPut, fiber.MethodPatch, fiber.MethodDelete} {
+		app.Add([]string{method}, "/invoke/:publicID", middleware.InvokeAuthMiddleware(gormDB), endpointHandler.Invoke)
+		app.Add([]string{method}, "/api/v1/invoke/:publicID", middleware.InvokeAuthMiddleware(gormDB), endpointHandler.Invoke)
+	}
+}
+
+func TestInvokeEndpointMethodEnforcement(t *testing.T) {
+	gormDB := testutil.OpenTestDB(t)
+	app, fixtures := newIsolationApp(t, gormDB)
+	path := fmt.Sprintf("/api/v1/invoke/%s", fixtures.endpoint.PublicID)
+	resp := doRequest(t, app, http.MethodPost, path, "", nil, map[string]string{
+		fiber.HeaderAuthorization: basicAuth(fixtures.userA.Username, fixtures.userAPassword),
+	})
+	if resp.StatusCode != fiber.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", resp.StatusCode)
+	}
+	if allow := resp.Header.Get(fiber.HeaderAllow); allow != http.MethodGet {
+		t.Fatalf("expected Allow header %s, got %s", http.MethodGet, allow)
 	}
 }
 

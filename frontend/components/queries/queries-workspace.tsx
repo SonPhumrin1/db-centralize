@@ -51,6 +51,7 @@ import {
   validateRestRequest,
   type StructuredRestRequest,
 } from "@/lib/rest-requests"
+import { formatNumber, formatUtcDateTime } from "@/lib/formatting"
 import { cn } from "@/lib/utils"
 
 type QueryDraft = {
@@ -640,7 +641,7 @@ export function QueriesWorkspace() {
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-secondary">
                               <TypeTag>{source?.type === "rest" ? "REST" : "SQL"}</TypeTag>
                               <span>{source?.name ?? "Missing source"}</span>
-                              <span className="mono-value">{new Date(query.updatedAt).toLocaleString()}</span>
+                              <span className="mono-value">{formatUtcDateTime(query.updatedAt)}</span>
                             </div>
                           </div>
                           <Button
@@ -765,7 +766,7 @@ export function QueriesWorkspace() {
                 <div>
                   <div className="toolbar">
                     <div className="mono-value text-secondary">
-                      {filteredRows.length.toLocaleString()} rows{executionMs ? ` / ${executionMs}ms` : ""}
+                      {formatNumber(filteredRows.length)} rows{executionMs ? ` / ${executionMs}ms` : ""}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Button onClick={exportCsv} size="sm" type="button" variant="ghost">
@@ -1002,7 +1003,7 @@ export function QueriesWorkspace() {
 
                       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
                         <p className="text-xs text-secondary">
-                          Showing {filteredRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredRows.length)} of {filteredRows.length.toLocaleString()} rows
+                          Showing {filteredRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredRows.length)} of {formatNumber(filteredRows.length)} rows
                         </p>
                         <div className="flex items-center gap-2">
                           <select

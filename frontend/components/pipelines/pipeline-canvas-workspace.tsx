@@ -33,6 +33,7 @@ import { PipelineNode } from "@/components/pipelines/pipeline-node"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { DataSource } from "@/lib/datasources"
+import { formatUtcDateTime } from "@/lib/formatting"
 import {
   humanizePipelineRunError,
   parseCanvasJson,
@@ -52,19 +53,7 @@ type NoticeState =
   | { kind: "success" | "error"; message: string }
 
 function formatSavedTimestamp(value?: string) {
-  if (!value) {
-    return "not saved yet"
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return "not saved yet"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
+  return formatUtcDateTime(value, { fallback: "not saved yet" })
 }
 
 async function readErrorMessage(response: Response) {

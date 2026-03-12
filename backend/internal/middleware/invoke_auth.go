@@ -32,7 +32,9 @@ func InvokeAuthMiddleware(gormDB *gorm.DB) fiber.Handler {
 
 		var endpoint model.Endpoint
 		if err := gormDB.WithContext(c.Context()).
-			Where("slug = ?", c.Params("slug")).
+			Where("public_id = ?", c.Params("publicID")).
+			Preload("Query").
+			Preload("Query.DataSource").
 			First(&endpoint).Error; err != nil {
 			return forbidden(c)
 		}

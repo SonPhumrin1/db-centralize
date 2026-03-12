@@ -11,6 +11,7 @@ import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatUtcDateTime } from "@/lib/formatting"
 import {
   defaultCanvasDocument,
   parseCanvasJson,
@@ -180,7 +181,9 @@ export function PipelinesWorkspace() {
                     tone={pipeline.lastRunStatus === "success" ? "success" : pipeline.lastRunStatus === "failed" ? "error" : "muted"}
                   />
                 </td>
-                <td className="mono-value text-secondary">{pipeline.lastRanAt ? new Date(pipeline.lastRanAt).toLocaleString() : "Never"}</td>
+                <td className="mono-value text-secondary">
+                  {formatUtcDateTime(pipeline.lastRanAt, { fallback: "Never" })}
+                </td>
                 <td className="mono-value text-secondary">{pipeline.runs}</td>
                 <td>
                   <div className="flex items-center justify-end gap-2">
@@ -232,4 +235,3 @@ export function PipelinesWorkspace() {
     </main>
   )
 }
-

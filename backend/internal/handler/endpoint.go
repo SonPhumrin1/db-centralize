@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 
 	"dataplatform/backend/internal/middleware"
 	"dataplatform/backend/internal/model"
@@ -63,6 +64,12 @@ func (h *EndpointHandler) Invoke(c fiber.Ctx) error {
 	endpoint, ok := c.Locals(middleware.EndpointLocalKey).(*model.Endpoint)
 	if !ok || endpoint == nil {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "forbidden"})
+	}
+
+	allowed := usecase.DeriveEndpointInvokeMethod(*endpoint)
+	if c.Method() != allowed {
+		c.Set(fiber.HeaderAllow, allowed)
+		return c.Status(fiber.StatusMethodNotAllowed).JSON(fiber.Map{"error": fmt.Sprintf("use %s", allowed)})
 	}
 
 	rows, err := h.usecase.Invoke(c.Context(), *endpoint)

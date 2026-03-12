@@ -20,6 +20,7 @@ import {
   type SaveTelegramIntegrationInput,
   type TelegramIntegration,
 } from "@/lib/telegram-integrations"
+import { formatUtcDateTime } from "@/lib/formatting"
 import { cn } from "@/lib/utils"
 
 type NoticeState =
@@ -300,7 +301,7 @@ export function TelegramIntegrationsWorkspace() {
                               tone={integration.isActive ? "success" : "muted"}
                             />
                             <span className="mono-value">
-                              {new Date(integration.updatedAt).toLocaleString()}
+                              {formatUtcDateTime(integration.updatedAt)}
                             </span>
                           </div>
                         </div>

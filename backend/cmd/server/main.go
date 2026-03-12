@@ -17,6 +17,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/logger"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -78,6 +79,8 @@ func main() {
 		AllowCredentials: true,
 	}))
 	app.Get("/health", healthHandler)
+	registerInvokeRoute(app, "/invoke/:publicID", gormDB, endpointHandler)
+	registerInvokeRoute(app, "/api/v1/invoke/:publicID", gormDB, endpointHandler)
 
 	api := app.Group("/api/v1", middleware.SessionAuthMiddleware(gormDB))
 	api.Get("/me", handler.Me)
@@ -118,23 +121,6 @@ func main() {
 	admin.Patch("/settings", systemSettingsHandler.Update)
 	admin.Post("/settings/root-password", systemSettingsHandler.ChangeRootPassword)
 
-	app.Get(
-		"/invoke/:slug",
-		limiter.New(limiter.Config{
-			Max:        60,
-			Expiration: time.Minute,
-			KeyGenerator: func(c fiber.Ctx) string {
-				return c.IP()
-			},
-			LimitReached: func(c fiber.Ctx) error {
-				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-					"error": "rate limit exceeded",
-				})
-			},
-		}),
-		middleware.InvokeAuthMiddleware(gormDB),
-		endpointHandler.Invoke,
-	)
 	app.Post("/webhooks/telegram/:id", telegramIntegrationHandler.Webhook)
 
 	if err := app.Listen(":" + cfg.Port); err != nil {
@@ -144,4 +130,28 @@ func main() {
 
 func healthHandler(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
+}
+
+func registerInvokeRoute(app *fiber.App, path string, gormDB *gorm.DB, endpointHandler *handler.EndpointHandler) {
+	methods := []string{fiber.MethodGet, fiber.MethodPost, fiber.MethodPut, fiber.MethodPatch, fiber.MethodDelete}
+	for _, method := range methods {
+		app.Add(
+			[]string{method},
+			path,
+			limiter.New(limiter.Config{
+				Max:        60,
+				Expiration: time.Minute,
+				KeyGenerator: func(c fiber.Ctx) string {
+					return c.IP()
+				},
+				LimitReached: func(c fiber.Ctx) error {
+					return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+						"error": "rate limit exceeded",
+					})
+				},
+			}),
+			middleware.InvokeAuthMiddleware(gormDB),
+			endpointHandler.Invoke,
+		)
+	}
 }

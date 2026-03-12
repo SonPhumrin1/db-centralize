@@ -3,21 +3,25 @@ package usecase
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	"dataplatform/backend/internal/model"
 	"dataplatform/backend/internal/repository"
+	"dataplatform/backend/internal/restrequest"
 )
 
 var ErrEndpointNotRunnable = errors.New("endpoint is not linked to a runnable query")
 
 type EndpointView struct {
-	ID        uint      `json:"id"`
-	QueryID   *uint     `json:"queryId,omitempty"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	IsActive  bool      `json:"isActive"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID           uint      `json:"id"`
+	QueryID      *uint     `json:"queryId,omitempty"`
+	Name         string    `json:"name"`
+	PublicID     string    `json:"publicId"`
+	Slug         string    `json:"slug"`
+	IsActive     bool      `json:"isActive"`
+	CreatedAt    time.Time `json:"createdAt"`
+	InvokeMethod string    `json:"invokeMethod"`
 }
 
 type EndpointUsecase struct {
@@ -83,11 +87,23 @@ func (u *EndpointUsecase) setActive(ctx context.Context, id, userID uint, active
 
 func toEndpointView(endpoint model.Endpoint) EndpointView {
 	return EndpointView{
-		ID:        endpoint.ID,
-		QueryID:   endpoint.QueryID,
-		Name:      endpoint.Name,
-		Slug:      endpoint.Slug,
-		IsActive:  endpoint.IsActive,
-		CreatedAt: endpoint.CreatedAt,
+		ID:           endpoint.ID,
+		QueryID:      endpoint.QueryID,
+		Name:         endpoint.Name,
+		PublicID:     endpoint.PublicID,
+		Slug:         endpoint.Slug,
+		IsActive:     endpoint.IsActive,
+		CreatedAt:    endpoint.CreatedAt,
+		InvokeMethod: DeriveEndpointInvokeMethod(endpoint),
 	}
+}
+
+func DeriveEndpointInvokeMethod(endpoint model.Endpoint) string {
+	method := http.MethodGet
+	if endpoint.QueryID != nil && endpoint.Query != nil && endpoint.Query.DataSource.Type == model.DataSourceTypeREST {
+		if req, err := restrequest.Parse(endpoint.Query.Body); err == nil {
+			method = req.Method
+		}
+	}
+	return method
 }
