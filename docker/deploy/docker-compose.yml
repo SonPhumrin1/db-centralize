@@ -26,8 +26,6 @@ services:
   backend:
     build:
       context: ../../backend
-    env_file:
-      - ./.env
     environment:
       PORT: ${API_PORT:-8080}
       BETTER_AUTH_URL: ${APP_PUBLIC_URL}
@@ -54,8 +52,6 @@ services:
         BETTER_AUTH_URL: ${APP_PUBLIC_URL}
         NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL}
         INTERNAL_API_URL: ${INTERNAL_API_URL}
-    env_file:
-      - ./.env
     environment:
       PORT: ${FRONTEND_PORT:-3000}
       BETTER_AUTH_URL: ${APP_PUBLIC_URL}
