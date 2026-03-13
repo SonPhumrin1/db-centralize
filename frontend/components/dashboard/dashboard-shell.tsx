@@ -87,7 +87,10 @@ export function DashboardShell({
     ? expandedSidebarPanelWidth
     : collapsedSidebarPanelWidth
   const sidebarRailWidth = collapsedSidebarPanelWidth + sidebarInset
-  const contentOffset = Math.max(sidebarPanelWidth - sidebarRailWidth, 0)
+  const contentOffset =
+    mode === "manual"
+      ? Math.max(sidebarPanelWidth - sidebarRailWidth, 0)
+      : 0
 
   return (
     <div className="app-shell md:flex md:gap-4 lg:gap-5">
@@ -113,11 +116,7 @@ export function DashboardShell({
 
       <div
         className="content-shell min-w-0 flex-1 transition-[padding-left] duration-260 ease-[cubic-bezier(0.22,1,0.36,1)] md:pl-[var(--sidebar-content-offset)]"
-        style={
-          {
-            "--sidebar-content-offset": `${contentOffset}px`,
-          } as CSSProperties
-        }
+        style={{ "--sidebar-content-offset": `${contentOffset}px` } as CSSProperties}
       >
         <div className="border-b border-border px-4 py-3 md:hidden">
           <div className="flex items-center justify-between gap-3">

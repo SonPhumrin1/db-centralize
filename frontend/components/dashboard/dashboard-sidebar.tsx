@@ -84,8 +84,12 @@ export function DashboardSidebar({
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             className={cn(
-              "flex items-center border-b border-[color:var(--sidebar-border)] transition-[padding] duration-240 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              expanded ? "justify-between px-4 py-4" : "justify-center px-3 py-4"
+              "relative flex items-center border-b border-[color:var(--sidebar-border)] transition-[padding] duration-240 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              expanded
+                ? mode === "manual"
+                  ? "px-4 py-4 pr-12"
+                  : "px-4 py-4"
+                : "justify-center px-3 py-4"
             )}
           >
             <div className="flex min-w-0 items-center gap-3">
@@ -115,7 +119,10 @@ export function DashboardSidebar({
 
             {mode === "manual" ? (
               <Button
-                className="size-8 shrink-0 rounded-full border border-transparent text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]"
+                className={cn(
+                  "size-8 shrink-0 rounded-full border border-transparent text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]",
+                  expanded ? "absolute top-1/2 right-3 -translate-y-1/2" : undefined
+                )}
                 onClick={() => {
                   const next = !manualCollapsed
                   onManualCollapsedChange(next)
