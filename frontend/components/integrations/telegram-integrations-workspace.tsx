@@ -85,7 +85,8 @@ export function TelegramIntegrationsWorkspace() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [form, setForm] = useState<TelegramFormState>(emptyForm)
   const [notice, setNotice] = useState<NoticeState>({ kind: "idle" })
-  const [pendingDelete, setPendingDelete] = useState<TelegramIntegration | null>(null)
+  const [pendingDelete, setPendingDelete] =
+    useState<TelegramIntegration | null>(null)
 
   const integrationsQuery = useQuery({
     queryKey: ["telegram-integrations"],
@@ -113,10 +114,13 @@ export function TelegramIntegrationsWorkspace() {
         )
       }
 
-      return fetchJson<TelegramIntegration>("/api/platform/integrations/telegram", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
+      return fetchJson<TelegramIntegration>(
+        "/api/platform/integrations/telegram",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }
+      )
     },
     onSuccess: async (integration) => {
       setSelectedId(integration.id)
@@ -199,7 +203,8 @@ export function TelegramIntegrationsWorkspace() {
     if (!selectedId && !form.botToken.trim()) {
       setNotice({
         kind: "error",
-        message: "A bot token is required when creating a Telegram integration.",
+        message:
+          "A bot token is required when creating a Telegram integration.",
       })
       return
     }
@@ -253,8 +258,9 @@ export function TelegramIntegrationsWorkspace() {
 
       {backendUnavailable ? (
         <InlineBanner tone="warning">
-          Telegram integration endpoints are not available on this backend yet. This screen expects
-          `GET/POST /api/v1/telegram-integrations` and `PUT/DELETE /api/v1/telegram-integrations/:id`.
+          Telegram integration endpoints are not available on this backend yet.
+          This screen expects `GET/POST /api/v1/telegram-integrations` and
+          `PUT/DELETE /api/v1/telegram-integrations/:id`.
         </InlineBanner>
       ) : null}
 
@@ -263,7 +269,9 @@ export function TelegramIntegrationsWorkspace() {
           <div className="panel-header">
             <div>
               <p className="page-label">Saved bots</p>
-              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Registry</h2>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                Registry
+              </h2>
             </div>
             <span className="mono-value text-secondary">
               {(integrationsQuery.data ?? []).length}
@@ -276,7 +284,27 @@ export function TelegramIntegrationsWorkspace() {
                 Loading Telegram integrations...
               </div>
             ) : (integrationsQuery.data ?? []).length === 0 ? (
-              <EmptyState message="No Telegram integrations configured yet." />
+              <div className="space-y-4 p-4">
+                <EmptyState
+                  action={
+                    <Button onClick={resetForm} type="button" variant="outline">
+                      <Plus className="size-4" />
+                      Start setup
+                    </Button>
+                  }
+                  message="No Telegram integrations configured yet."
+                />
+                <div className="bg-surface-raised rounded-[8px] border border-border px-4 py-4">
+                  <p className="page-label">First run checklist</p>
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-secondary">
+                    <p>1. Create a bot in BotFather and copy the token.</p>
+                    <p>2. Choose the fallback chat ID for pipeline sends.</p>
+                    <p>
+                      3. Save once, then register the generated webhook path.
+                    </p>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="divide-y divide-border">
                 {(integrationsQuery.data ?? []).map((integration) => {
@@ -287,14 +315,18 @@ export function TelegramIntegrationsWorkspace() {
                       key={integration.id}
                       className={cn(
                         "w-full px-4 py-3 text-left transition-colors",
-                        isSelected ? "bg-accent-soft" : "hover:bg-surface-raised"
+                        isSelected
+                          ? "bg-accent-soft"
+                          : "hover:bg-surface-raised"
                       )}
                       onClick={() => selectIntegration(integration)}
                       type="button"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate font-medium">{integration.name}</p>
+                          <p className="truncate font-medium">
+                            {integration.name}
+                          </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-secondary">
                             <StatusBadge
                               label={integration.isActive ? "Active" : "Paused"}
@@ -332,20 +364,25 @@ export function TelegramIntegrationsWorkspace() {
               onSubmit={(event) => event.preventDefault()}
             >
               {selectedIntegration ? (
-                <div className="rounded-[8px] border border-border bg-surface-raised px-4 py-3 text-sm text-secondary">
-                  Stored token stays hidden after save. Leave the token field empty to keep the
-                  current bot token, or enter a new one to rotate it.
+                <div className="bg-surface-raised rounded-[8px] border border-border px-4 py-3 text-sm text-secondary">
+                  Stored token stays hidden after save. Leave the token field
+                  empty to keep the current bot token, or enter a new one to
+                  rotate it.
                 </div>
               ) : null}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field
+                  autoComplete="organization-title"
                   label="Display name"
-                  onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, name: value }))
+                  }
                   placeholder="Warehouse alerts bot"
                   value={form.name}
                 />
                 <Field
+                  autoComplete="off"
                   label="Default chat ID"
                   onChange={(value) =>
                     setForm((current) => ({ ...current, defaultChatId: value }))
@@ -357,6 +394,7 @@ export function TelegramIntegrationsWorkspace() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field
+                  autoComplete="new-password"
                   label={selectedId ? "Replace bot token" : "Bot token"}
                   onChange={(value) =>
                     setForm((current) => ({ ...current, botToken: value }))
@@ -366,6 +404,7 @@ export function TelegramIntegrationsWorkspace() {
                   value={form.botToken}
                 />
                 <Field
+                  autoComplete="new-password"
                   label="Webhook secret"
                   onChange={(value) =>
                     setForm((current) => ({ ...current, webhookSecret: value }))
@@ -376,11 +415,12 @@ export function TelegramIntegrationsWorkspace() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-                <div className="rounded-[8px] border border-border bg-surface-raised px-4 py-3 text-sm leading-7 text-secondary">
-                  Default chat ID is the fallback target when the pipeline send node does not set
-                  an override and the input row has no `telegram_chat_id` value.
+                <div className="bg-surface-raised rounded-[8px] border border-border px-4 py-3 text-sm leading-7 text-secondary">
+                  Default chat ID is the fallback target when the pipeline send
+                  node does not set an override and the input row has no
+                  `telegram_chat_id` value.
                 </div>
-                <div className="flex items-center justify-between gap-3 border border-border bg-surface-raised px-4 py-3 md:min-w-[200px]">
+                <div className="bg-surface-raised flex items-center justify-between gap-3 border border-border px-4 py-3 md:min-w-[200px]">
                   <div>
                     <p className="page-label">Status</p>
                     <p className="mt-1 text-sm text-secondary">
@@ -397,9 +437,9 @@ export function TelegramIntegrationsWorkspace() {
               </div>
 
               {selectedIntegration?.webhookPath ? (
-                <div className="rounded-[8px] border border-border bg-surface-raised px-4 py-3">
+                <div className="bg-surface-raised rounded-[8px] border border-border px-4 py-3">
                   <p className="page-label">Webhook URL</p>
-                  <p className="mt-2 break-all font-mono text-xs leading-6 text-foreground">
+                  <p className="mt-2 font-mono text-xs leading-6 break-all text-foreground">
                     {buildWebhookUrl(selectedIntegration)}
                   </p>
                 </div>
@@ -429,7 +469,9 @@ export function TelegramIntegrationsWorkspace() {
             <div className="panel-header">
               <div>
                 <p className="page-label">Runtime fields</p>
-                <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Expected values</h2>
+                <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                  Expected values
+                </h2>
               </div>
             </div>
             <div className="border-b border-border px-4 py-3">
@@ -441,8 +483,9 @@ export function TelegramIntegrationsWorkspace() {
               </div>
             </div>
             <div className="panel-body text-sm leading-7 text-secondary">
-              Trigger and send nodes can read these row fields directly. Saved defaults on the
-              integration act as fallback transport settings rather than row data.
+              Trigger and send nodes can read these row fields directly. Saved
+              defaults on the integration act as fallback transport settings
+              rather than row data.
             </div>
           </section>
         </div>
@@ -476,12 +519,14 @@ export function TelegramIntegrationsWorkspace() {
 }
 
 function Field({
+  autoComplete,
   label,
   onChange,
   placeholder,
   type = "text",
   value,
 }: {
+  autoComplete?: string
   label: string
   onChange: (value: string) => void
   placeholder?: string
@@ -492,6 +537,7 @@ function Field({
     <label className="field-stack">
       <span className="field-label">{label}</span>
       <Input
+        autoComplete={autoComplete}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -513,10 +559,12 @@ function GuidanceCard({
   return (
     <article className="panel">
       <div className="panel-body">
-        <span className="inline-flex size-9 items-center justify-center border border-border bg-surface-raised text-[color:var(--accent)]">
+        <span className="bg-surface-raised inline-flex size-9 items-center justify-center border border-border text-[color:var(--accent)]">
           {icon}
         </span>
-        <h2 className="mt-4 text-base font-semibold tracking-[-0.03em]">{title}</h2>
+        <h2 className="mt-4 text-base font-semibold tracking-[-0.03em]">
+          {title}
+        </h2>
         <p className="mt-3 text-sm leading-7 text-secondary">{description}</p>
       </div>
     </article>

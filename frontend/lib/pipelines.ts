@@ -313,7 +313,7 @@ export function summarizeNode(node: PipelineFlowNode) {
     }
     case "output": {
       const config = node.data.config as OutputNodeConfig
-      const endpointText = config.exposeAsEndpoint ? " • endpoint draft" : ""
+      const endpointText = config.exposeAsEndpoint ? " • endpoint defaults" : ""
       return node.data.rowCount
         ? `${node.data.rowCount} rows${endpointText}`
         : `No output yet${endpointText}`

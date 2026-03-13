@@ -43,7 +43,7 @@ export function InlineBanner({
         ? "border-[color:color-mix(in_oklab,var(--warning)_38%,transparent)] bg-[color:color-mix(in_oklab,var(--warning)_12%,transparent)] text-foreground"
         : tone === "error"
           ? "border-[color:color-mix(in_oklab,var(--danger)_34%,transparent)] bg-[color:color-mix(in_oklab,var(--danger)_10%,transparent)] text-foreground"
-          : "border-[color:color-mix(in_oklab,var(--accent)_22%,var(--border))] bg-[color:color-mix(in_oklab,var(--accent)_8%,var(--surface-raised))] text-foreground"
+          : "border-[color:color-mix(in_oklab,var(--accent)_26%,var(--border))] bg-[color:var(--surface-tint-strong)] text-foreground"
   const Icon =
     tone === "success"
       ? CheckCircle2

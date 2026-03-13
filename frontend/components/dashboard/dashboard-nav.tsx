@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Settings,
+  Users,
   Workflow,
 } from "lucide-react"
 import Link from "next/link"
@@ -27,28 +28,82 @@ type DashboardNavProps = {
 }
 
 const baseItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", dividerAfter: false },
-  { href: "/dashboard/sources", icon: Database, label: "Sources", dividerAfter: false },
-  { href: "/dashboard/queries", icon: ListChecks, label: "Queries", dividerAfter: true },
-  { href: "/dashboard/endpoints", icon: Cable, label: "Endpoints", dividerAfter: false },
-  { href: "/dashboard/pipelines", icon: Workflow, label: "Pipelines", dividerAfter: false },
-  { href: "/dashboard/integrations", icon: Bot, label: "Integrations", dividerAfter: true },
-  { href: "/dashboard/settings", icon: Settings, label: "Settings", dividerAfter: false },
+  {
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    dividerAfter: false,
+  },
+  {
+    href: "/dashboard/sources",
+    icon: Database,
+    label: "Sources",
+    dividerAfter: false,
+  },
+  {
+    href: "/dashboard/queries",
+    icon: ListChecks,
+    label: "Queries",
+    dividerAfter: true,
+  },
+  {
+    href: "/dashboard/endpoints",
+    icon: Cable,
+    label: "Endpoints",
+    dividerAfter: false,
+  },
+  {
+    href: "/dashboard/pipelines",
+    icon: Workflow,
+    label: "Pipelines",
+    dividerAfter: false,
+  },
+  {
+    href: "/dashboard/integrations",
+    icon: Bot,
+    label: "Integrations",
+    dividerAfter: true,
+  },
 ]
 
 export function DashboardNav({
+  isAdmin,
   orientation = "vertical",
   collapsed = false,
   tone = "default",
 }: DashboardNavProps) {
   const pathname = usePathname()
-  const items = baseItems
+  const items = isAdmin
+    ? [
+        ...baseItems,
+        {
+          href: "/dashboard/users",
+          icon: Users,
+          label: "Users",
+          dividerAfter: false,
+        },
+        {
+          href: "/dashboard/settings",
+          icon: Settings,
+          label: "Settings",
+          dividerAfter: false,
+        },
+      ]
+    : [
+        ...baseItems,
+        {
+          href: "/dashboard/settings",
+          icon: Settings,
+          label: "Settings",
+          dividerAfter: false,
+        },
+      ]
 
   return (
     <nav
       className={cn(
         orientation === "horizontal"
-          ? "flex gap-2 overflow-x-auto pb-1"
+          ? "grid grid-cols-4 gap-2"
           : collapsed
             ? "flex flex-col items-center gap-3"
             : "flex flex-col gap-1"
@@ -65,7 +120,9 @@ export function DashboardNav({
           <Link
             className={cn(
               "inline-flex items-center overflow-hidden text-sm transition-[padding,gap,background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              orientation === "horizontal" ? "shrink-0" : "w-full",
+              orientation === "horizontal"
+                ? "min-h-14 w-full flex-col justify-center gap-1 rounded-[var(--radius-md)] border border-transparent px-2 py-2 text-center text-[11px] leading-tight"
+                : "w-full",
               orientation === "vertical" &&
                 (collapsed
                   ? "size-9 justify-center gap-0 rounded-[var(--radius-md)] px-0 py-0"
@@ -76,7 +133,7 @@ export function DashboardNav({
                   : "bg-accent-soft text-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent)_18%,transparent)]"
                 : tone === "sidebar"
                   ? "text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]"
-                  : "text-secondary hover:bg-surface-raised hover:text-foreground"
+                  : "hover:bg-surface-raised text-secondary hover:text-foreground"
             )}
             href={item.href}
           >
@@ -85,8 +142,8 @@ export function DashboardNav({
               className={cn(
                 "overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 orientation === "vertical" && collapsed
-                  ? "max-w-0 opacity-0 -translate-x-2"
-                  : "max-w-32 opacity-100 translate-x-0"
+                  ? "max-w-0 -translate-x-2 opacity-0"
+                  : "max-w-32 translate-x-0 opacity-100"
               )}
             >
               {item.label}

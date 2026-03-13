@@ -233,13 +233,19 @@ func TestPipelineRepositoryOwnershipAndLatestRuns(t *testing.T) {
 	}
 
 	oldRun := &model.PipelineRun{
-		PipelineID:     pipeline.ID,
+		PipelineID:     &pipeline.ID,
+		PipelineName:   pipeline.Name,
+		RunMode:        model.PipelineRunModeSaved,
+		CanvasSnapshot: pipeline.CanvasJSON,
 		Status:         model.PipelineRunStatusError,
 		ResultSnapshot: `{"error":"boom"}`,
 		RanAt:          time.Now().UTC().Add(-time.Hour),
 	}
 	newRun := &model.PipelineRun{
-		PipelineID:     pipeline.ID,
+		PipelineID:     &pipeline.ID,
+		PipelineName:   pipeline.Name,
+		RunMode:        model.PipelineRunModeSaved,
+		CanvasSnapshot: pipeline.CanvasJSON,
 		Status:         model.PipelineRunStatusSuccess,
 		ResultSnapshot: `[{"ok":true}]`,
 		RanAt:          time.Now().UTC(),

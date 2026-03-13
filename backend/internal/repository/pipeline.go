@@ -115,6 +115,7 @@ func (r *pipelineRepository) FindLatestRuns(ctx context.Context, userID uint) (m
 		Model(&model.PipelineRun{}).
 		Joins("JOIN pipelines ON pipelines.id = pipeline_runs.pipeline_id").
 		Where("pipelines.user_id = ?", userID).
+		Where("pipeline_runs.pipeline_id IS NOT NULL").
 		Order("pipeline_runs.ran_at DESC").
 		Find(&runs).Error; err != nil {
 		return nil, fmt.Errorf("find pipeline runs: %w", err)
@@ -122,10 +123,13 @@ func (r *pipelineRepository) FindLatestRuns(ctx context.Context, userID uint) (m
 
 	latest := make(map[uint]model.PipelineRun, len(runs))
 	for _, run := range runs {
-		if _, exists := latest[run.PipelineID]; exists {
+		if run.PipelineID == nil {
 			continue
 		}
-		latest[run.PipelineID] = run
+		if _, exists := latest[*run.PipelineID]; exists {
+			continue
+		}
+		latest[*run.PipelineID] = run
 	}
 
 	return latest, nil

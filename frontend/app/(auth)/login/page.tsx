@@ -20,9 +20,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <main className="flex min-h-svh items-center justify-center px-5 py-8 md:px-8">
-      <div className="w-full max-w-[380px]">
-        <section className="bg-surface rounded-[24px] border border-border px-6 py-7 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+    <main className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface)_74%,var(--surface-tint)_26%)_0%,var(--background)_44%,var(--background)_100%)] px-5 py-8 md:px-8">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top,rgba(88,140,233,0.16),transparent_62%)]" />
+
+      <div className="relative w-full max-w-[420px]">
+        <section className="bg-surface rounded-[28px] border border-border px-6 py-7 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
           <div className="flex justify-center">
             <div className="bg-surface-subtle flex size-11 items-center justify-center rounded-2xl border border-border text-foreground">
               <LogIn className="size-4" />
@@ -37,6 +39,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <p className="mt-3 text-sm leading-6 text-secondary">
               Use the local bootstrap account while the Docker stack is running.
             </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <span className="type-tag">local docker</span>
+              <span className="type-tag">bootstrap auth</span>
+              <span className="type-tag">operator access</span>
+            </div>
           </div>
 
           <div className="mt-7">
@@ -51,6 +58,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </p>
           </div>
         </section>
+
       </div>
     </main>
   )

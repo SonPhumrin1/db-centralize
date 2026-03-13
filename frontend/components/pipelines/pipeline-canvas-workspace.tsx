@@ -187,14 +187,33 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
   })
 
   const runMutation = useMutation({
-    mutationFn: () => fetchJson<unknown>(`/api/platform/pipelines/${pipelineId}/run`, { method: "POST" }),
+    mutationFn: () =>
+      fetchJson<unknown>("/api/platform/pipelines/run-draft", {
+        method: "POST",
+        body: JSON.stringify({
+          name: trimmedName,
+          canvasJson: currentCanvasJson,
+        }),
+      }),
     onSuccess: (payload) => {
       const rows = parsePipelineRunRows(payload)
       setOutputRows(rows)
-      setNotice({ kind: "success", message: rows.length > 0 ? `Pipeline ran with ${rows.length} rows.` : "Pipeline ran with no rows." })
+      setNotice({
+        kind: "success",
+        message:
+          rows.length > 0
+            ? `Pipeline draft ran with ${rows.length} rows.`
+            : "Pipeline draft ran with no rows.",
+      })
     },
     onError: (error) => {
-      setNotice({ kind: "error", message: error instanceof Error ? humanizePipelineRunError(error.message) : "Failed to run pipeline." })
+      setNotice({
+        kind: "error",
+        message:
+          error instanceof Error
+            ? humanizePipelineRunError(error.message)
+            : "Failed to run pipeline.",
+      })
     },
   })
 
@@ -214,11 +233,6 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
   }
 
   function runPipeline() {
-    if (hasUnsavedChanges) {
-      setNotice({ kind: "error", message: `Save first. Run uses the backend version saved at ${savedAtLabel}.` })
-      return
-    }
-
     const issues = validatePipelineDocument(
       { nodes, edges },
       sourcesQuery.data ?? [],
@@ -271,7 +285,7 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
             </Button>
           </div>
         }
-        description="Wire nodes on the canvas, save the graph state, and run only the last persisted version."
+        description="Wire nodes on the canvas, save the graph state when you want to persist it, and run the current draft anytime."
         label="Canvas"
         title={pipeline.name}
       />
@@ -309,7 +323,7 @@ function PipelineCanvasWorkspaceInner({ pipelineId }: { pipelineId: number }) {
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="overflow-hidden rounded-[10px] border border-[color:var(--canvas-border)] bg-[color:var(--canvas-surface)] text-[color:var(--canvas-foreground)]">
           <div className="border-b border-[color:var(--canvas-border)] px-4 py-3 text-sm text-[color:color-mix(in_oklab,var(--canvas-foreground)_72%,transparent)]">
-            Full-page canvas. Save before running to persist graph edits.
+            Full-page canvas. Run executes the current draft; Save persists the graph separately.
           </div>
           <div className="grid-dots h-[76vh]">
             <ReactFlow

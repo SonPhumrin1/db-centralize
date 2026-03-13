@@ -206,12 +206,14 @@ func newIsolationApp(t *testing.T, gormDB *gorm.DB) (*fiber.App, isolationFixtur
 	dataSourceRepo := repository.NewDataSourceRepository(gormDB)
 	queryRepo := repository.NewQueryRepository(gormDB)
 	endpointRepo := repository.NewEndpointRepository(gormDB)
+	endpointLogRepo := repository.NewEndpointExecutionLogRepository(gormDB)
 	pipelineRepo := repository.NewPipelineRepository(gormDB)
 	telegramRepo := repository.NewTelegramIntegrationRepository(gormDB)
+	systemSettingsRepo := repository.NewSystemSettingsRepository(gormDB)
 	queryUC := usecase.NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, isolationEncryptionKey)
 	dataSourceUC := usecase.NewDataSourceUsecase(dataSourceRepo, isolationEncryptionKey, nil)
-	endpointUC := usecase.NewEndpointUsecase(endpointRepo, queryUC)
 	pipelineUC := usecase.NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
+	endpointUC := usecase.NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 
 	userAPassword := "owner-secret"
 	userA := testutil.MustCreateUser(t, gormDB, testutil.UserSeed{

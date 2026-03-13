@@ -6,7 +6,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 
-import { InlineBanner, PageHeader, StatusBadge } from "@/components/dashboard/platform-ui"
+import {
+  InlineBanner,
+  PageHeader,
+  StatusBadge,
+} from "@/components/dashboard/platform-ui"
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +37,10 @@ async function readErrorMessage(response: Response) {
   return payload || `Request failed with status ${response.status}`
 }
 
-async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+async function fetchJson<T>(
+  input: RequestInfo,
+  init?: RequestInit
+): Promise<T> {
   const response = await fetch(input, {
     ...init,
     headers: {
@@ -63,7 +70,11 @@ function totalRuns(pipeline: PipelineSummary) {
 
 function shouldIgnoreRowNavigation(target: EventTarget | null) {
   return target instanceof Element
-    ? Boolean(target.closest("button, a, input, textarea, select, [data-row-ignore-navigation='true']"))
+    ? Boolean(
+        target.closest(
+          "button, a, input, textarea, select, [data-row-ignore-navigation='true']"
+        )
+      )
     : false
 }
 
@@ -71,19 +82,36 @@ export function PipelinesWorkspace() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [draftName, setDraftName] = useState("Revenue mesh")
-  const [notice, setNotice] = useState<{ kind: "idle" | "success" | "error"; message?: string }>({ kind: "idle" })
-  const [pipelinePendingDelete, setPipelinePendingDelete] = useState<PipelineSummary | null>(null)
+  const [notice, setNotice] = useState<{
+    kind: "idle" | "success" | "error"
+    message?: string
+  }>({ kind: "idle" })
+  const [pipelinePendingDelete, setPipelinePendingDelete] =
+    useState<PipelineSummary | null>(null)
 
   const pipelinesQuery = useQuery({
     queryKey: ["pipelines"],
     queryFn: () => fetchJson<PipelineSummary[]>("/api/platform/pipelines"),
   })
 
-  const summaries = useMemo(() => (pipelinesQuery.data ?? []).map((pipeline) => ({
-    ...pipeline,
-    nodes: nodeCount(pipeline),
-    runs: totalRuns(pipeline),
-  })), [pipelinesQuery.data])
+  const summaries = useMemo(
+    () =>
+      (pipelinesQuery.data ?? []).map((pipeline) => ({
+        ...pipeline,
+        nodes: nodeCount(pipeline),
+        runs: totalRuns(pipeline),
+      })),
+    [pipelinesQuery.data]
+  )
+  const healthyPipelines = summaries.filter(
+    (pipeline) => pipeline.lastRunStatus === "success"
+  ).length
+  const attentionPipelines = summaries.filter(
+    (pipeline) =>
+      pipeline.lastRunStatus === "failed" ||
+      pipeline.lastRunStatus === "error" ||
+      pipeline.lastRunStatus === null
+  ).length
 
   const createMutation = useMutation({
     mutationFn: (payload: SavePipelineInput) =>
@@ -97,7 +125,11 @@ export function PipelinesWorkspace() {
       router.push(`/dashboard/pipelines/${pipeline.id}/canvas`)
     },
     onError: (error) => {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to create pipeline." })
+      setNotice({
+        kind: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to create pipeline.",
+      })
     },
   })
 
@@ -110,7 +142,11 @@ export function PipelinesWorkspace() {
       await queryClient.invalidateQueries({ queryKey: ["pipelines"] })
     },
     onError: (error) => {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to delete pipeline." })
+      setNotice({
+        kind: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to delete pipeline.",
+      })
     },
   })
 
@@ -128,10 +164,17 @@ export function PipelinesWorkspace() {
           <div className="flex flex-wrap items-end gap-2">
             <div className="grid min-w-[220px] gap-1.5">
               <span className="field-label">New pipeline</span>
-              <Input onChange={(event) => setDraftName(event.target.value)} value={draftName} />
+              <Input
+                onChange={(event) => setDraftName(event.target.value)}
+                value={draftName}
+              />
             </div>
             <Button onClick={createPipeline} type="button">
-              {createMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              {createMutation.isPending ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
               Open Canvas
             </Button>
           </div>
@@ -147,7 +190,138 @@ export function PipelinesWorkspace() {
         </InlineBanner>
       ) : null}
 
-      <section className="table-wrap overflow-x-auto">
+      <section className="stat-strip">
+        <div className="stat-cell">
+          <p className="page-label">Total pipelines</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {summaries.length}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Saved canvas definitions
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Healthy</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {healthyPipelines}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Most recent run succeeded
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Needs attention</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {attentionPipelines}
+          </p>
+          <p className="mt-1 text-sm text-secondary">Drafts or failed runs</p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Total runs</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {summaries.reduce((total, pipeline) => total + pipeline.runs, 0)}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Synthetic runtime snapshot
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-3 md:hidden">
+        {pipelinesQuery.isLoading
+          ? Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="panel">
+                <div className="panel-body space-y-3">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3.5 w-24" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              </div>
+            ))
+          : null}
+
+        {!pipelinesQuery.isLoading &&
+          summaries.map((pipeline) => (
+            <article
+              key={pipeline.id}
+              className="panel hover:bg-surface-raised cursor-pointer transition-colors"
+              onClick={(event) => {
+                if (shouldIgnoreRowNavigation(event.target)) {
+                  return
+                }
+
+                router.push(`/dashboard/pipelines/${pipeline.id}/canvas`)
+              }}
+            >
+              <div className="panel-body space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{pipeline.name}</p>
+                    <p className="mt-1 text-sm text-secondary">
+                      Last run{" "}
+                      {formatUtcDateTime(pipeline.lastRanAt, {
+                        fallback: "Never",
+                      })}
+                    </p>
+                  </div>
+                  <StatusBadge
+                    label={pipeline.lastRunStatus ?? "Draft"}
+                    tone={
+                      pipeline.lastRunStatus === "success"
+                        ? "success"
+                        : pipeline.lastRunStatus === "failed"
+                          ? "error"
+                          : "muted"
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-surface-raised rounded-[8px] border border-border px-3 py-3">
+                    <p className="page-label">Nodes</p>
+                    <p className="mt-2 font-mono text-sm text-foreground">
+                      {pipeline.nodes}
+                    </p>
+                  </div>
+                  <div className="bg-surface-raised rounded-[8px] border border-border px-3 py-3">
+                    <p className="page-label">Runs</p>
+                    <p className="mt-2 font-mono text-sm text-foreground">
+                      {pipeline.runs}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild size="sm" type="button" variant="outline">
+                    <Link href={`/dashboard/pipelines/${pipeline.id}/canvas`}>
+                      <Network className="size-4" />
+                      Open canvas
+                    </Link>
+                  </Button>
+                  <Button
+                    onClick={() => setPipelinePendingDelete(pipeline)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Trash2 className="size-4" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))}
+
+        {!pipelinesQuery.isLoading && summaries.length === 0 ? (
+          <div className="panel">
+            <div className="panel-body text-sm text-secondary">
+              No pipelines yet. Create one to open the canvas.
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="table-wrap hidden overflow-x-auto md:block">
         <table className="data-table min-w-[920px]">
           <thead>
             <tr>
@@ -177,55 +351,71 @@ export function PipelinesWorkspace() {
                 ))
               : null}
 
-            {!pipelinesQuery.isLoading && summaries.map((pipeline) => (
-              <tr
-                key={pipeline.id}
-                className="data-row cursor-pointer"
-                onClick={(event) => {
-                  if (shouldIgnoreRowNavigation(event.target)) {
-                    return
-                  }
+            {!pipelinesQuery.isLoading &&
+              summaries.map((pipeline) => (
+                <tr
+                  key={pipeline.id}
+                  className="data-row cursor-pointer"
+                  onClick={(event) => {
+                    if (shouldIgnoreRowNavigation(event.target)) {
+                      return
+                    }
 
-                  router.push(`/dashboard/pipelines/${pipeline.id}/canvas`)
-                }}
-              >
-                <td className="font-medium">{pipeline.name}</td>
-                <td className="mono-value text-secondary">{pipeline.nodes}</td>
-                <td>
-                  <StatusBadge
-                    label={pipeline.lastRunStatus ?? "Draft"}
-                    tone={pipeline.lastRunStatus === "success" ? "success" : pipeline.lastRunStatus === "failed" ? "error" : "muted"}
-                  />
-                </td>
-                <td className="mono-value text-secondary">
-                  {formatUtcDateTime(pipeline.lastRanAt, { fallback: "Never" })}
-                </td>
-                <td className="mono-value text-secondary">{pipeline.runs}</td>
-                <td>
-                  <div className="flex items-center justify-end gap-2">
-                    <Button asChild size="sm" type="button" variant="ghost">
-                      <Link href={`/dashboard/pipelines/${pipeline.id}/canvas`}>
-                        <Network className="size-4" />
-                        Open Canvas
-                      </Link>
-                    </Button>
-                    <Button
-                      onClick={() => setPipelinePendingDelete(pipeline)}
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2 className="size-4" />
-                      Delete
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                    router.push(`/dashboard/pipelines/${pipeline.id}/canvas`)
+                  }}
+                >
+                  <td className="font-medium">{pipeline.name}</td>
+                  <td className="mono-value text-secondary">
+                    {pipeline.nodes}
+                  </td>
+                  <td>
+                    <StatusBadge
+                      label={pipeline.lastRunStatus ?? "Draft"}
+                      tone={
+                        pipeline.lastRunStatus === "success"
+                          ? "success"
+                          : pipeline.lastRunStatus === "failed"
+                            ? "error"
+                            : "muted"
+                      }
+                    />
+                  </td>
+                  <td className="mono-value text-secondary">
+                    {formatUtcDateTime(pipeline.lastRanAt, {
+                      fallback: "Never",
+                    })}
+                  </td>
+                  <td className="mono-value text-secondary">{pipeline.runs}</td>
+                  <td>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button asChild size="sm" type="button" variant="ghost">
+                        <Link
+                          href={`/dashboard/pipelines/${pipeline.id}/canvas`}
+                        >
+                          <Network className="size-4" />
+                          Open Canvas
+                        </Link>
+                      </Button>
+                      <Button
+                        onClick={() => setPipelinePendingDelete(pipeline)}
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
 
             {!pipelinesQuery.isLoading && summaries.length === 0 ? (
               <tr>
-                <td className="py-14 text-center text-sm text-secondary" colSpan={6}>
+                <td
+                  className="py-14 text-center text-sm text-secondary"
+                  colSpan={6}
+                >
                   No pipelines yet. Create one to open the canvas.
                 </td>
               </tr>
@@ -236,7 +426,11 @@ export function PipelinesWorkspace() {
 
       <ConfirmActionDialog
         confirmLabel="Delete pipeline"
-        description={pipelinePendingDelete ? `This removes ${pipelinePendingDelete.name} and its saved canvas graph.` : ""}
+        description={
+          pipelinePendingDelete
+            ? `This removes ${pipelinePendingDelete.name} and its saved canvas graph.`
+            : ""
+        }
         onConfirm={() => {
           if (!pipelinePendingDelete) {
             return

@@ -1,10 +1,28 @@
 "use client"
 
 import { Fragment, useMemo, useState } from "react"
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ChevronDown, ChevronRight, Database, Globe, Plus, RefreshCcw, Trash2 } from "lucide-react"
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
+import {
+  ChevronDown,
+  ChevronRight,
+  Database,
+  Globe,
+  Plus,
+  RefreshCcw,
+  Trash2,
+} from "lucide-react"
 
-import { InlineBanner, PageHeader, StatusBadge, TypeTag } from "@/components/dashboard/platform-ui"
+import {
+  InlineBanner,
+  PageHeader,
+  StatusBadge,
+  TypeTag,
+} from "@/components/dashboard/platform-ui"
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -100,7 +118,8 @@ export function SourcesWorkspace() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [form, setForm] = useState<SourceFormState>(initialFormState)
   const [notice, setNotice] = useState<NoticeState>({ kind: "idle" })
-  const [sourcePendingDelete, setSourcePendingDelete] = useState<DataSource | null>(null)
+  const [sourcePendingDelete, setSourcePendingDelete] =
+    useState<DataSource | null>(null)
 
   const sourcesQuery = useQuery({
     queryKey: ["datasources"],
@@ -121,14 +140,19 @@ export function SourcesWorkspace() {
     queries: databaseSources.map((source) => ({
       queryKey: ["datasource-schema", source.id],
       queryFn: () =>
-        fetchJson<SchemaResult>(`/api/platform/datasources/${source.id}/schema`),
+        fetchJson<SchemaResult>(
+          `/api/platform/datasources/${source.id}/schema`
+        ),
       staleTime: 300_000,
     })),
   })
 
   const schemasById = useMemo(() => {
     const entries: Array<[number, SchemaResult | undefined]> =
-      databaseSources.map((source, index) => [source.id, schemaQueries[index]?.data])
+      databaseSources.map((source, index) => [
+        source.id,
+        schemaQueries[index]?.data,
+      ])
 
     return new Map(entries)
   }, [databaseSources, schemaQueries])
@@ -158,7 +182,9 @@ export function SourcesWorkspace() {
       setNotice({
         kind: "error",
         message:
-          error instanceof Error ? error.message : "Failed to create data source.",
+          error instanceof Error
+            ? error.message
+            : "Failed to create data source.",
       })
     },
   })
@@ -200,7 +226,9 @@ export function SourcesWorkspace() {
       setNotice({
         kind: "error",
         message:
-          error instanceof Error ? error.message : "Failed to retest data source.",
+          error instanceof Error
+            ? error.message
+            : "Failed to retest data source.",
       })
     },
   })
@@ -223,7 +251,9 @@ export function SourcesWorkspace() {
       setNotice({
         kind: "error",
         message:
-          error instanceof Error ? error.message : "Failed to delete data source.",
+          error instanceof Error
+            ? error.message
+            : "Failed to delete data source.",
       })
     },
   })
@@ -264,12 +294,24 @@ export function SourcesWorkspace() {
   }
 
   const busy = createMutation.isPending || testDraftMutation.isPending
+  const sources = sourcesQuery.data ?? []
+  const connectedSources = sources.filter(
+    (source) => source.status === "connected"
+  )
+  const restSources = sources.filter((source) => source.type === "rest")
+  const totalLinkedQueries = Array.from(queryCountBySource.values()).reduce(
+    (total, count) => total + count,
+    0
+  )
 
   return (
     <main className="workspace-main space-y-5">
       <PageHeader
         actions={
-          <Button onClick={() => setIsCreateOpen((current) => !current)} type="button">
+          <Button
+            onClick={() => setIsCreateOpen((current) => !current)}
+            type="button"
+          >
             <Plus className="size-4" />
             Add Source
           </Button>
@@ -280,19 +322,73 @@ export function SourcesWorkspace() {
       />
 
       {notice.kind !== "idle" ? (
-        <InlineBanner tone={notice.kind === "success" ? "success" : notice.kind === "warning" ? "warning" : "error"}>
+        <InlineBanner
+          tone={
+            notice.kind === "success"
+              ? "success"
+              : notice.kind === "warning"
+                ? "warning"
+                : "error"
+          }
+        >
           {notice.message}
         </InlineBanner>
       ) : null}
+
+      <section className="stat-strip">
+        <div className="stat-cell">
+          <p className="page-label">Connections</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {sources.length}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            {connectedSources.length} validated
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Database sources</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {databaseSources.length}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Schema introspection enabled
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">REST sources</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {restSources.length}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Request-driven integrations
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Linked queries</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {totalLinkedQueries}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Saved workbench drafts using these sources
+          </p>
+        </div>
+      </section>
 
       {isCreateOpen ? (
         <section className="panel">
           <div className="panel-header">
             <div>
               <p className="page-label">New Source</p>
-              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Connection details</h2>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                Connection details
+              </h2>
             </div>
-            <Button onClick={() => setIsCreateOpen(false)} size="sm" type="button" variant="ghost">
+            <Button
+              onClick={() => setIsCreateOpen(false)}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
               Close
             </Button>
           </div>
@@ -304,7 +400,10 @@ export function SourcesWorkspace() {
               <Field label="Source name">
                 <Input
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, name: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
                   }
                   placeholder="Orders warehouse"
                   value={form.name}
@@ -313,7 +412,9 @@ export function SourcesWorkspace() {
               <Field label="Source type">
                 <select
                   className="field-select"
-                  onChange={(event) => updateType(event.target.value as DataSourceType)}
+                  onChange={(event) =>
+                    updateType(event.target.value as DataSourceType)
+                  }
                   value={form.type}
                 >
                   {sourceTypeOptions.map((option) => (
@@ -342,7 +443,12 @@ export function SourcesWorkspace() {
                 type="button"
                 variant="outline"
               >
-                <RefreshCcw className={cn("size-4", testDraftMutation.isPending && "animate-spin")} />
+                <RefreshCcw
+                  className={cn(
+                    "size-4",
+                    testDraftMutation.isPending && "animate-spin"
+                  )}
+                />
                 {testDraftMutation.isPending ? "Testing..." : "Test connection"}
               </Button>
               <Button
@@ -387,142 +493,210 @@ export function SourcesWorkspace() {
                 ))
               : null}
 
-            {!sourcesQuery.isLoading && (sourcesQuery.data ?? []).map((source) => {
-              const isExpanded = expandedSourceId === source.id
-              const isRetesting = retestMutation.isPending && retestMutation.variables === source.id
-              const isDeleting = deleteMutation.isPending && deleteMutation.variables === source.id
-              const schema = schemasById.get(source.id)
+            {!sourcesQuery.isLoading &&
+              (sourcesQuery.data ?? []).map((source) => {
+                const isExpanded = expandedSourceId === source.id
+                const isRetesting =
+                  retestMutation.isPending &&
+                  retestMutation.variables === source.id
+                const isDeleting =
+                  deleteMutation.isPending &&
+                  deleteMutation.variables === source.id
+                const schema = schemasById.get(source.id)
 
-              return (
-                <Fragment key={source.id}>
-                  <tr
-                    key={source.id}
-                    className={cn("data-row cursor-pointer", isExpanded && "data-row-selected")}
-                    onClick={() =>
-                      setExpandedSourceId((current) => (current === source.id ? null : source.id))
-                    }
-                  >
-                    <td className="font-medium">{source.name}</td>
-                    <td>
-                      <TypeTag>
-                        {sourceTypeOptions.find((item) => item.value === source.type)?.label ?? source.type}
-                      </TypeTag>
-                    </td>
-                    <td className="mono-value text-secondary">{summarizeHost(source)}</td>
-                    <td>
-                      <StatusBadge
-                        label={source.status === "connected" ? "Active" : "Warning"}
-                        tone={source.status === "connected" ? "success" : "warning"}
-                      />
-                    </td>
-                    <td className="mono-value text-secondary">{queryCountBySource.get(source.id) ?? 0}</td>
-                    <td>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            retestMutation.mutate(source.id)
-                          }}
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <RefreshCcw className={cn("size-4", isRetesting && "animate-spin")} />
-                          Test
-                        </Button>
-                        <Button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSourcePendingDelete(source)
-                          }}
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <Trash2 className="size-4" />
-                          {isDeleting ? "Deleting" : "Delete"}
-                        </Button>
-                        <span className="text-secondary">
-                          {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                  {isExpanded ? (
-                    <tr key={`expanded-${source.id}`}>
-                      <td className="bg-surface-raised px-4 py-4" colSpan={6}>
-                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-                          <div className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <DetailField label="Connection">
-                                <span className="mono-value">{summarizeHost(source)}</span>
-                              </DetailField>
-                              <DetailField label="Last tested">
-                                <span className="mono-value">
-                                  {formatUtcDateTime(source.lastTestedAt, { fallback: "Never" })}
-                                </span>
-                              </DetailField>
-                              <DetailField label="Credentials hint">
-                                <span className="text-sm text-secondary">
-                                  {source.type === "rest"
-                                    ? `Auth ${source.summary.authType ?? "none"} is stored securely.`
-                                    : "Password is encrypted and never shown in the UI."}
-                                </span>
-                              </DetailField>
-                              <DetailField label="Schema preview">
-                                {source.type === "rest" ? (
-                                  <span className="text-sm text-secondary">REST sources do not expose table schema.</span>
-                                ) : schema ? (
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {schema.tables.slice(0, 8).map((table) => (
-                                      <TypeTag key={table}>{table}</TypeTag>
-                                    ))}
-                                    {schema.tables.length === 0 ? <span className="text-sm text-secondary">No tables cached.</span> : null}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-secondary">Loading schema...</span>
-                                )}
-                              </DetailField>
-                            </div>
-                          </div>
-
-                          <div className="rounded-[8px] border border-border bg-surface px-4 py-4">
-                            <p className="page-label">Operator actions</p>
-                            <div className="mt-3 space-y-3 text-sm text-secondary">
-                              <div className="flex items-center justify-between">
-                                <span>Connection health</span>
-                                <StatusBadge
-                                  label={source.status === "connected" ? "Connected" : "Needs attention"}
-                                  tone={source.status === "connected" ? "success" : "warning"}
-                                />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span>Source family</span>
-                                {source.type === "rest" ? <Globe className="size-4" /> : <Database className="size-4" />}
-                              </div>
-                              <Button
-                                className="w-full justify-center"
-                                disabled={isRetesting}
-                                onClick={() => retestMutation.mutate(source.id)}
-                                type="button"
-                                variant="outline"
-                              >
-                                <RefreshCcw className={cn("size-4", isRetesting && "animate-spin")} />
-                                Test connection
-                              </Button>
-                            </div>
-                          </div>
+                return (
+                  <Fragment key={source.id}>
+                    <tr
+                      key={source.id}
+                      className={cn(
+                        "data-row cursor-pointer",
+                        isExpanded && "data-row-selected"
+                      )}
+                      onClick={() =>
+                        setExpandedSourceId((current) =>
+                          current === source.id ? null : source.id
+                        )
+                      }
+                    >
+                      <td className="font-medium">{source.name}</td>
+                      <td>
+                        <TypeTag>
+                          {sourceTypeOptions.find(
+                            (item) => item.value === source.type
+                          )?.label ?? source.type}
+                        </TypeTag>
+                      </td>
+                      <td className="mono-value text-secondary">
+                        {summarizeHost(source)}
+                      </td>
+                      <td>
+                        <StatusBadge
+                          label={
+                            source.status === "connected" ? "Active" : "Warning"
+                          }
+                          tone={
+                            source.status === "connected"
+                              ? "success"
+                              : "warning"
+                          }
+                        />
+                      </td>
+                      <td className="mono-value text-secondary">
+                        {queryCountBySource.get(source.id) ?? 0}
+                      </td>
+                      <td>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              retestMutation.mutate(source.id)
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <RefreshCcw
+                              className={cn(
+                                "size-4",
+                                isRetesting && "animate-spin"
+                              )}
+                            />
+                            Test
+                          </Button>
+                          <Button
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setSourcePendingDelete(source)
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 className="size-4" />
+                            {isDeleting ? "Deleting" : "Delete"}
+                          </Button>
+                          <span className="text-secondary">
+                            {isExpanded ? (
+                              <ChevronDown className="size-4" />
+                            ) : (
+                              <ChevronRight className="size-4" />
+                            )}
+                          </span>
                         </div>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              )
-            })}
+                    {isExpanded ? (
+                      <tr key={`expanded-${source.id}`}>
+                        <td className="bg-surface-raised px-4 py-4" colSpan={6}>
+                          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+                            <div className="space-y-4">
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <DetailField label="Connection">
+                                  <span className="mono-value">
+                                    {summarizeHost(source)}
+                                  </span>
+                                </DetailField>
+                                <DetailField label="Last tested">
+                                  <span className="mono-value">
+                                    {formatUtcDateTime(source.lastTestedAt, {
+                                      fallback: "Never",
+                                    })}
+                                  </span>
+                                </DetailField>
+                                <DetailField label="Credentials hint">
+                                  <span className="text-sm text-secondary">
+                                    {source.type === "rest"
+                                      ? `Auth ${source.summary.authType ?? "none"} is stored securely.`
+                                      : "Password is encrypted and never shown in the UI."}
+                                  </span>
+                                </DetailField>
+                                <DetailField label="Schema preview">
+                                  {source.type === "rest" ? (
+                                    <span className="text-sm text-secondary">
+                                      REST sources do not expose table schema.
+                                    </span>
+                                  ) : schema ? (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {schema.tables
+                                        .slice(0, 8)
+                                        .map((table) => (
+                                          <TypeTag key={table}>{table}</TypeTag>
+                                        ))}
+                                      {schema.tables.length === 0 ? (
+                                        <span className="text-sm text-secondary">
+                                          No tables cached.
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-secondary">
+                                      Loading schema...
+                                    </span>
+                                  )}
+                                </DetailField>
+                              </div>
+                            </div>
 
-            {!sourcesQuery.isLoading && (sourcesQuery.data ?? []).length === 0 ? (
+                            <div className="bg-surface rounded-[8px] border border-border px-4 py-4">
+                              <p className="page-label">Operator actions</p>
+                              <div className="mt-3 space-y-3 text-sm text-secondary">
+                                <div className="flex items-center justify-between">
+                                  <span>Connection health</span>
+                                  <StatusBadge
+                                    label={
+                                      source.status === "connected"
+                                        ? "Connected"
+                                        : "Needs attention"
+                                    }
+                                    tone={
+                                      source.status === "connected"
+                                        ? "success"
+                                        : "warning"
+                                    }
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>Source family</span>
+                                  {source.type === "rest" ? (
+                                    <Globe className="size-4" />
+                                  ) : (
+                                    <Database className="size-4" />
+                                  )}
+                                </div>
+                                <Button
+                                  className="w-full justify-center"
+                                  disabled={isRetesting}
+                                  onClick={() =>
+                                    retestMutation.mutate(source.id)
+                                  }
+                                  type="button"
+                                  variant="outline"
+                                >
+                                  <RefreshCcw
+                                    className={cn(
+                                      "size-4",
+                                      isRetesting && "animate-spin"
+                                    )}
+                                  />
+                                  Test connection
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                )
+              })}
+
+            {!sourcesQuery.isLoading &&
+            (sourcesQuery.data ?? []).length === 0 ? (
               <tr>
-                <td className="py-14 text-center text-sm text-secondary" colSpan={6}>
+                <td
+                  className="py-14 text-center text-sm text-secondary"
+                  colSpan={6}
+                >
                   No sources yet. Add a source to start querying.
                 </td>
               </tr>
@@ -666,7 +840,9 @@ function RestFields({ config, onChange }: RestFieldsProps) {
       <Field label="Auth type">
         <select
           className="field-select"
-          onChange={(event) => onChange("authType", event.target.value as RestAuthType)}
+          onChange={(event) =>
+            onChange("authType", event.target.value as RestAuthType)
+          }
           value={authType}
         >
           {restAuthOptions.map((option) => (
@@ -710,13 +886,17 @@ function RestFields({ config, onChange }: RestFieldsProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Username">
             <Input
-              onChange={(event) => onChange("basicUsername", event.target.value)}
+              onChange={(event) =>
+                onChange("basicUsername", event.target.value)
+              }
               value={config.basicUsername ?? ""}
             />
           </Field>
           <Field label="Password">
             <Input
-              onChange={(event) => onChange("basicPassword", event.target.value)}
+              onChange={(event) =>
+                onChange("basicPassword", event.target.value)
+              }
               type="password"
               value={config.basicPassword ?? ""}
             />
@@ -768,4 +948,3 @@ function serializeHeaders(headers?: Record<string, string>) {
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n")
 }
-

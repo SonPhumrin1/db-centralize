@@ -12,7 +12,7 @@ import (
 	"dataplatform/backend/internal/executor"
 	"dataplatform/backend/internal/model"
 	"dataplatform/backend/internal/repository"
-	"gorm.io/gorm"
+	"dataplatform/backend/internal/restrequest"
 )
 
 type CreatePipelineInput struct {
@@ -27,6 +27,13 @@ type UpdatePipelineInput struct {
 
 type RunPipelineInput struct {
 	TelegramEvents map[string]json.RawMessage `json:"telegramEvents"`
+}
+
+type RunDraftPipelineInput struct {
+	Name           string                     `json:"name"`
+	CanvasJSON     string                     `json:"canvasJson"`
+	TelegramEvents map[string]json.RawMessage `json:"telegramEvents"`
+	Params         map[string]any             `json:"params"`
 }
 
 type PipelineView struct {
@@ -57,9 +64,19 @@ func NewPipelineUsecase(
 		repo:         repo,
 		endpointRepo: endpointRepo,
 		executor: &executor.PipelineExecutor{
-			ResolveSource:              dataSourceRepo.FindByID,
-			RunDB:                      queryUsecase.RunAgainstSource,
-			RunREST:                    queryUsecase.FetchREST,
+			ResolveSource: dataSourceRepo.FindByID,
+			RunDB: func(ctx context.Context, source model.DataSource, queryBody string, options executor.QueryExecutionOptions) ([]map[string]any, error) {
+				return queryUsecase.RunAgainstSource(ctx, source, queryBody, QueryRunOptions{
+					Params:   options.Params,
+					RowLimit: options.RowLimit,
+				})
+			},
+			RunREST: func(ctx context.Context, source model.DataSource, request restrequest.Request, options executor.QueryExecutionOptions) ([]map[string]any, error) {
+				return queryUsecase.FetchREST(ctx, source, request, QueryRunOptions{
+					Params:   options.Params,
+					RowLimit: options.RowLimit,
+				})
+			},
 			ResolveTelegramIntegration: telegramRepo.FindByID,
 			SendTelegram:               sendTelegram,
 		},
@@ -110,11 +127,6 @@ func (u *PipelineUsecase) Create(ctx context.Context, userID uint, input CreateP
 		return nil, err
 	}
 
-	if err := u.syncPipelineEndpoint(ctx, pipeline); err != nil {
-		_ = u.repo.Delete(ctx, pipeline.ID, userID)
-		return nil, err
-	}
-
 	view := toPipelineView(*pipeline)
 	return &view, nil
 }
@@ -133,10 +145,6 @@ func (u *PipelineUsecase) Update(ctx context.Context, id, userID uint, input Upd
 	pipeline.Name = updated.Name
 	pipeline.CanvasJSON = updated.CanvasJSON
 	if err := u.repo.Update(ctx, pipeline); err != nil {
-		return nil, err
-	}
-
-	if err := u.syncPipelineEndpoint(ctx, pipeline); err != nil {
 		return nil, err
 	}
 
@@ -167,9 +175,39 @@ func (u *PipelineUsecase) RunWithInput(ctx context.Context, id, userID uint, inp
 		return nil, err
 	}
 
-	return u.runPipeline(ctx, pipeline, executor.ExecuteOptions{
+	return u.runPipeline(ctx, pipeline.UserID, &pipeline.ID, pipeline.Name, pipeline.CanvasJSON, model.PipelineRunModeSaved, executor.ExecuteOptions{
 		Manual:         true,
 		TelegramEvents: telegramEvents,
+	})
+}
+
+func (u *PipelineUsecase) RunWithRuntimeParams(ctx context.Context, id, userID uint, params map[string]any) ([]map[string]any, error) {
+	pipeline, err := u.repo.FindByID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.runPipeline(ctx, pipeline.UserID, &pipeline.ID, pipeline.Name, pipeline.CanvasJSON, model.PipelineRunModeSaved, executor.ExecuteOptions{
+		Manual: true,
+		Params: params,
+	})
+}
+
+func (u *PipelineUsecase) RunDraft(ctx context.Context, userID uint, input RunDraftPipelineInput) ([]map[string]any, error) {
+	pipeline, err := buildPipelineModel(userID, input.Name, input.CanvasJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	telegramEvents, err := parseManualTelegramEvents(input.TelegramEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.runPipeline(ctx, userID, nil, pipeline.Name, pipeline.CanvasJSON, model.PipelineRunModeDraft, executor.ExecuteOptions{
+		Manual:         true,
+		TelegramEvents: telegramEvents,
+		Params:         input.Params,
 	})
 }
 
@@ -201,11 +239,11 @@ func (u *PipelineUsecase) RunTriggeredByTelegram(
 			result.MatchedPipelines++
 			result.FailedPipelines++
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: %s", pipeline.Name, execErr.Error()))
-			_ = u.recordPipelineRun(ctx, pipeline.ID, nil, execErr)
+			_ = u.recordPipelineRun(ctx, &pipeline.ID, pipeline.Name, pipeline.CanvasJSON, model.PipelineRunModeTelegram, nil, execErr)
 			continue
 		default:
 			result.MatchedPipelines++
-			if err := u.recordPipelineRun(ctx, pipeline.ID, execRows, nil); err != nil {
+			if err := u.recordPipelineRun(ctx, &pipeline.ID, pipeline.Name, pipeline.CanvasJSON, model.PipelineRunModeTelegram, execRows, nil); err != nil {
 				return TelegramWebhookResult{}, err
 			}
 		}
@@ -232,50 +270,6 @@ func buildPipelineModel(userID uint, name string, rawCanvas string) (*model.Pipe
 		Name:       strings.TrimSpace(name),
 		CanvasJSON: canvasJSON,
 	}, nil
-}
-
-func (u *PipelineUsecase) syncPipelineEndpoint(ctx context.Context, pipeline *model.Pipeline) error {
-	endpointName, shouldExpose, err := executor.FirstPublishedOutputName(pipeline.CanvasJSON, pipeline.Name)
-	if err != nil {
-		return err
-	}
-
-	existing, findErr := u.endpointRepo.FindByPipelineID(ctx, pipeline.ID, pipeline.UserID)
-	if shouldExpose {
-		if findErr == nil {
-			existing.Name = endpointName
-			existing.IsActive = false
-			existing.QueryID = nil
-			existing.PipelineID = &pipeline.ID
-			return u.endpointRepo.Update(ctx, existing)
-		}
-		if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-			return findErr
-		}
-
-		slug, err := generateUniqueSlug(ctx, endpointName, u.endpointRepo)
-		if err != nil {
-			return err
-		}
-
-		return u.endpointRepo.Create(ctx, &model.Endpoint{
-			UserID:     pipeline.UserID,
-			PipelineID: &pipeline.ID,
-			Name:       endpointName,
-			Slug:       slug,
-			IsActive:   false,
-			CreatedAt:  time.Now().UTC(),
-		})
-	}
-
-	if errors.Is(findErr, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	if findErr != nil {
-		return findErr
-	}
-
-	return u.endpointRepo.Delete(ctx, existing.ID, pipeline.UserID)
 }
 
 func toPipelineView(pipeline model.Pipeline) PipelineView {
@@ -347,9 +341,9 @@ func parseManualTelegramRows(raw json.RawMessage) ([]map[string]any, error) {
 	}
 }
 
-func (u *PipelineUsecase) runPipeline(ctx context.Context, pipeline *model.Pipeline, options executor.ExecuteOptions) ([]map[string]any, error) {
-	rows, execErr := u.executor.ExecuteWithOptions(ctx, pipeline.UserID, pipeline.CanvasJSON, options)
-	if err := u.recordPipelineRun(ctx, pipeline.ID, rows, execErr); err != nil {
+func (u *PipelineUsecase) runPipeline(ctx context.Context, userID uint, pipelineID *uint, pipelineName string, canvasJSON string, runMode string, options executor.ExecuteOptions) ([]map[string]any, error) {
+	rows, execErr := u.executor.ExecuteWithOptions(ctx, userID, canvasJSON, options)
+	if err := u.recordPipelineRun(ctx, pipelineID, pipelineName, canvasJSON, runMode, rows, execErr); err != nil {
 		return nil, err
 	}
 	if execErr != nil {
@@ -359,11 +353,23 @@ func (u *PipelineUsecase) runPipeline(ctx context.Context, pipeline *model.Pipel
 	return rows, nil
 }
 
-func (u *PipelineUsecase) recordPipelineRun(ctx context.Context, pipelineID uint, rows []map[string]any, execErr error) error {
+func (u *PipelineUsecase) recordPipelineRun(ctx context.Context, pipelineID *uint, pipelineName string, canvasJSON string, runMode string, rows []map[string]any, execErr error) error {
 	run := &model.PipelineRun{
-		PipelineID: pipelineID,
-		Status:     model.PipelineRunStatusSuccess,
-		RanAt:      time.Now().UTC(),
+		PipelineID:     pipelineID,
+		PipelineName:   strings.TrimSpace(pipelineName),
+		RunMode:        strings.TrimSpace(runMode),
+		Status:         model.PipelineRunStatusSuccess,
+		CanvasSnapshot: strings.TrimSpace(canvasJSON),
+		RanAt:          time.Now().UTC(),
+	}
+	if run.PipelineName == "" {
+		run.PipelineName = "Pipeline"
+	}
+	if run.RunMode == "" {
+		run.RunMode = model.PipelineRunModeSaved
+	}
+	if run.CanvasSnapshot == "" {
+		run.CanvasSnapshot = "{}"
 	}
 	if execErr != nil {
 		run.Status = model.PipelineRunStatusError

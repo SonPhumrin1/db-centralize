@@ -1,51 +1,50 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  AlertCircle,
-  CheckCircle2,
-  Copy,
-  KeyRound,
-  Link2,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react"
-import { Fragment, useMemo, useState } from "react"
+import { Copy, Plus, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 
 import {
+  InlineBanner,
   PageHeader,
+  StatusBadge,
 } from "@/components/dashboard/platform-ui"
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import type { Endpoint } from "@/lib/endpoints"
+  endpointAuthModeOptions,
+  endpointPaginationModeOptions,
+  type Endpoint,
+  type EndpointAuthMode,
+  type EndpointExecutionLog,
+  type EndpointPaginationMode,
+  type EndpointParameter,
+  type EndpointTargetKind,
+  type SaveEndpointInput,
+} from "@/lib/endpoints"
 import { formatNumber, formatUtcDateTime } from "@/lib/formatting"
+import type { PipelineSummary } from "@/lib/pipelines"
 import type { SavedQuery } from "@/lib/queries"
-import { cn } from "@/lib/utils"
+
+type NoticeState =
+  | { kind: "idle" }
+  | { kind: "success" | "error"; message: string }
+
+type EndpointFormState = {
+  id: number | null
+  targetKind: EndpointTargetKind
+  targetId: number
+  name: string
+  slug: string
+  authMode: EndpointAuthMode
+  parameters: EndpointParameter[]
+  paginationMode: EndpointPaginationMode
+  defaultPageSize: string
+  maxPageSize: string
+  cursorField: string
+}
 
 async function readErrorMessage(response: Response) {
   const payload = await response.text()
@@ -83,104 +82,131 @@ async function fetchJson<T>(
   return (await response.json()) as T
 }
 
-function encodeBasicAuth(username: string, password: string) {
-  return btoa(`${username}:${password}`)
-}
-
 function buildInvokeBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080").replace(/\/$/, "")
+  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080").replace(
+    /\/$/,
+    ""
+  )
 }
 
 function endpointUrl(publicId: string) {
   return `${buildInvokeBaseUrl()}/api/v1/invoke/${publicId}`
 }
 
-function endpointMethod(endpoint: Endpoint) {
-  return endpoint.invokeMethod ?? "GET"
+function emptyForm(): EndpointFormState {
+  return {
+    id: null,
+    targetKind: "query",
+    targetId: 0,
+    name: "",
+    slug: "",
+    authMode: "none",
+    parameters: [],
+    paginationMode: "none",
+    defaultPageSize: "25",
+    maxPageSize: "100",
+    cursorField: "",
+  }
 }
 
-function mockCallCount(endpoint: Endpoint) {
-  return ((endpoint.id * 37) % 4200) + (endpoint.isActive ? 120 : 0)
+function formFromEndpoint(endpoint: Endpoint): EndpointFormState {
+  return {
+    id: endpoint.id,
+    targetKind: endpoint.targetKind,
+    targetId: endpoint.targetId,
+    name: endpoint.name,
+    slug: endpoint.slug,
+    authMode: endpoint.authMode,
+    parameters: endpoint.parameters ?? [],
+    paginationMode: endpoint.paginationMode,
+    defaultPageSize: String(endpoint.pagination.defaultPageSize ?? 25),
+    maxPageSize: String(endpoint.pagination.maxPageSize ?? 100),
+    cursorField: endpoint.pagination.cursorField ?? "",
+  }
 }
 
-function formatLastCalled(endpoint: Endpoint) {
-  const baseTime = new Date(endpoint.createdAt).getTime() + endpoint.id * 3_600_000
-  return formatUtcDateTime(new Date(baseTime), { includeSeconds: true })
+function buildSavePayload(form: EndpointFormState): SaveEndpointInput {
+  return {
+    targetKind: form.targetKind,
+    targetId: form.targetId,
+    name: form.name.trim(),
+    slug: form.slug.trim(),
+    authMode: form.authMode,
+    parameters: form.parameters
+      .map((parameter) => ({
+        ...parameter,
+        name: parameter.name.trim(),
+        label: parameter.label?.trim(),
+        description: parameter.description?.trim(),
+        location: parameter.location?.trim(),
+        defaultValue: parameter.defaultValue?.trim() || undefined,
+      }))
+      .filter((parameter) => parameter.name),
+    paginationMode: form.paginationMode,
+    pagination:
+      form.paginationMode === "none"
+        ? {}
+        : {
+            defaultPageSize: Number(form.defaultPageSize) || 25,
+            maxPageSize: Number(form.maxPageSize) || 100,
+            cursorField:
+              form.paginationMode === "cursor" ? form.cursorField.trim() : "",
+          },
+  }
 }
 
-function buildCurlPreview(method: string, headerValue: string, invokeUrl: string) {
-  return `curl -X ${method} -H "${headerValue}" "${invokeUrl}"`
+function addParameter(parameters: EndpointParameter[]) {
+  return [
+    ...parameters,
+    {
+      name: "",
+      label: "",
+      description: "",
+      required: false,
+      defaultValue: "",
+      location: "query",
+    },
+  ]
 }
 
-function shouldIgnoreRowToggle(target: EventTarget | null) {
-  return target instanceof Element
-    ? Boolean(target.closest("button, a, input, textarea, [role='switch'], [data-row-ignore-toggle='true']"))
-    : false
+function targetLabel(
+  endpoint: Endpoint,
+  queryMap: Map<number, string>,
+  pipelineMap: Map<number, string>
+) {
+  return endpoint.targetKind === "query"
+    ? queryMap.get(endpoint.targetId) ?? "Query"
+    : pipelineMap.get(endpoint.targetId) ?? "Pipeline"
 }
 
-function EndpointStatusBadge({ isActive }: { isActive: boolean }) {
-  return (
-    <Badge
-      className={cn(
-        "gap-1 rounded-full px-2.5",
-        isActive
-          ? "border-[color:color-mix(in_oklab,var(--success)_28%,transparent)] bg-[color:color-mix(in_oklab,var(--success)_12%,transparent)] text-foreground"
-          : "border-border bg-surface-raised text-secondary"
-      )}
-      variant="outline"
-    >
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          isActive ? "bg-[color:var(--success)]" : "bg-[color:var(--tertiary)]"
-        )}
-      />
-      {isActive ? "Active" : "Draft"}
-    </Badge>
-  )
+function invokeHeader(endpoint: Endpoint) {
+  switch (endpoint.authMode) {
+    case "none":
+      return null
+    case "api_key":
+      return 'X-API-Key: <your-api-key>'
+    case "legacy_basic":
+      return 'Authorization: Basic <legacy-credentials>'
+  }
 }
 
-function MethodBadge({ method }: { method: string }) {
-  return (
-    <Badge
-      className="rounded-full border-border bg-surface-raised font-mono text-[11px] tracking-[0.08em] text-foreground"
-      variant="outline"
-    >
-      {method}
-    </Badge>
-  )
+function buildCurlPreview(endpoint: Endpoint) {
+  const header = invokeHeader(endpoint)
+  const method = endpoint.invokeMethod ?? "GET"
+  const url = endpointUrl(endpoint.publicId)
+  return header
+    ? `curl -X ${method} -H "${header}" "${url}"`
+    : `curl -X ${method} "${url}"`
 }
 
-function NoticeAlert({
-  kind,
-  message,
-}: {
-  kind: "success" | "error"
-  message: string
-}) {
-  const Icon = kind === "success" ? CheckCircle2 : AlertCircle
-
-  return (
-    <Alert
-      className={cn(
-        kind === "success"
-          ? "border-[color:color-mix(in_oklab,var(--success)_30%,transparent)] bg-[color:color-mix(in_oklab,var(--success)_10%,transparent)]"
-          : "border-[color:color-mix(in_oklab,var(--danger)_34%,transparent)] bg-[color:color-mix(in_oklab,var(--danger)_10%,transparent)]"
-      )}
-    >
-      <Icon className="size-4" />
-      <AlertTitle>{kind === "success" ? "Updated" : "Action failed"}</AlertTitle>
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
-  )
-}
-
-export function EndpointsWorkspace({ username }: { username: string }) {
+export function EndpointsWorkspace() {
   const queryClient = useQueryClient()
-  const [password, setPassword] = useState("")
-  const [notice, setNotice] = useState<{ kind: "idle" | "success" | "error"; message?: string }>({ kind: "idle" })
-  const [endpointPendingDelete, setEndpointPendingDelete] = useState<Endpoint | null>(null)
-  const [helperEndpointId, setHelperEndpointId] = useState<number | null>(null)
+  const [notice, setNotice] = useState<NoticeState>({ kind: "idle" })
+  const [form, setForm] = useState<EndpointFormState>(emptyForm())
+  const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null)
+  const [endpointPendingDelete, setEndpointPendingDelete] = useState<Endpoint | null>(
+    null
+  )
 
   const endpointsQuery = useQuery({
     queryKey: ["endpoints"],
@@ -192,47 +218,159 @@ export function EndpointsWorkspace({ username }: { username: string }) {
     queryFn: () => fetchJson<SavedQuery[]>("/api/platform/queries"),
   })
 
-  const queryNameById = useMemo(() => {
-    return new Map((queriesQuery.data ?? []).map((query) => [query.id, query.name]))
-  }, [queriesQuery.data])
+  const pipelinesQuery = useQuery({
+    queryKey: ["pipelines"],
+    queryFn: () => fetchJson<PipelineSummary[]>("/api/platform/pipelines"),
+  })
 
-  const activateMutation = useMutation({
-    mutationFn: (id: number) =>
-      fetchJson<Endpoint>(`/api/platform/endpoints/${id}/activate`, { method: "PATCH" }),
-    onSuccess: async () => {
-      setNotice({ kind: "success", message: "Endpoint activated." })
+  const logsQuery = useQuery({
+    enabled: selectedEndpointId !== null,
+    queryKey: ["endpoint-logs", selectedEndpointId],
+    queryFn: () =>
+      fetchJson<EndpointExecutionLog[]>(
+        `/api/platform/endpoints/${selectedEndpointId}/logs`
+      ),
+  })
+
+  const endpoints = endpointsQuery.data ?? []
+  const queries = queriesQuery.data ?? []
+  const pipelines = pipelinesQuery.data ?? []
+  const queryMap = useMemo(
+    () => new Map(queries.map((query) => [query.id, query.name])),
+    [queries]
+  )
+  const pipelineMap = useMemo(
+    () => new Map(pipelines.map((pipeline) => [pipeline.id, pipeline.name])),
+    [pipelines]
+  )
+  const selectedEndpoint =
+    endpoints.find((endpoint) => endpoint.id === selectedEndpointId) ?? null
+
+  useEffect(() => {
+    if (form.targetId !== 0) {
+      return
+    }
+
+    if (form.targetKind === "query" && queries.length > 0) {
+      setForm((current) => ({ ...current, targetId: queries[0]?.id ?? 0 }))
+    }
+
+    if (form.targetKind === "pipeline" && pipelines.length > 0) {
+      setForm((current) => ({ ...current, targetId: pipelines[0]?.id ?? 0 }))
+    }
+  }, [form.targetId, form.targetKind, pipelines, queries])
+
+  const saveMutation = useMutation({
+    mutationFn: (payload: SaveEndpointInput) =>
+      form.id
+        ? fetchJson<Endpoint>(`/api/platform/endpoints/${form.id}`, {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          })
+        : fetchJson<Endpoint>("/api/platform/endpoints", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          }),
+    onSuccess: async (endpoint) => {
+      setForm(formFromEndpoint(endpoint))
+      setSelectedEndpointId(endpoint.id)
+      setNotice({
+        kind: "success",
+        message: form.id ? "Endpoint updated." : "Endpoint created.",
+      })
       await queryClient.invalidateQueries({ queryKey: ["endpoints"] })
     },
     onError: (error) => {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to activate endpoint." })
+      setNotice({
+        kind: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to save endpoint.",
+      })
     },
   })
 
-  const deactivateMutation = useMutation({
-    mutationFn: (id: number) =>
-      fetchJson<Endpoint>(`/api/platform/endpoints/${id}/deactivate`, { method: "PATCH" }),
-    onSuccess: async () => {
-      setNotice({ kind: "success", message: "Endpoint deactivated." })
+  const activateMutation = useMutation({
+    mutationFn: (endpoint: Endpoint) =>
+      fetchJson<Endpoint>(
+        `/api/platform/endpoints/${endpoint.id}/${
+          endpoint.isActive ? "deactivate" : "activate"
+        }`,
+        {
+          method: "PATCH",
+        }
+      ),
+    onSuccess: async (endpoint) => {
+      setNotice({
+        kind: "success",
+        message: endpoint.isActive ? "Endpoint activated." : "Endpoint deactivated.",
+      })
       await queryClient.invalidateQueries({ queryKey: ["endpoints"] })
     },
     onError: (error) => {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to deactivate endpoint." })
+      setNotice({
+        kind: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to toggle endpoint.",
+      })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
       fetchJson<void>(`/api/platform/endpoints/${id}`, { method: "DELETE" }),
-    onSuccess: async () => {
+    onSuccess: async (_, id) => {
       setEndpointPendingDelete(null)
-      setHelperEndpointId(null)
+      if (selectedEndpointId === id) {
+        setSelectedEndpointId(null)
+      }
+      if (form.id === id) {
+        setForm(emptyForm())
+      }
       setNotice({ kind: "success", message: "Endpoint deleted." })
       await queryClient.invalidateQueries({ queryKey: ["endpoints"] })
     },
     onError: (error) => {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to delete endpoint." })
+      setNotice({
+        kind: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to delete endpoint.",
+      })
     },
   })
+
+  function resetForm(kind: EndpointTargetKind = "query") {
+    setForm({
+      ...emptyForm(),
+      targetKind: kind,
+      targetId:
+        kind === "query"
+          ? (queries[0]?.id ?? 0)
+          : (pipelines[0]?.id ?? 0),
+    })
+  }
+
+  function saveEndpoint() {
+    if (!form.name.trim()) {
+      setNotice({ kind: "error", message: "Endpoint name is required." })
+      return
+    }
+    if (!form.targetId) {
+      setNotice({ kind: "error", message: "Select a target query or pipeline." })
+      return
+    }
+    if (
+      form.paginationMode === "cursor" &&
+      !form.cursorField.trim()
+    ) {
+      setNotice({
+        kind: "error",
+        message: "Cursor pagination requires a cursor field.",
+      })
+      return
+    }
+
+    saveMutation.mutate(buildSavePayload(form))
+  }
 
   async function copyText(value: string, message: string) {
     await navigator.clipboard.writeText(value)
@@ -243,281 +381,554 @@ export function EndpointsWorkspace({ username }: { username: string }) {
     <main className="workspace-main space-y-5">
       <PageHeader
         actions={
-          <form
-            className="grid min-w-[240px] gap-1.5"
-            onSubmit={(event) => event.preventDefault()}
-          >
-            <input
-              aria-hidden="true"
-              autoComplete="username"
-              className="sr-only"
-              name="username"
-              readOnly
-              tabIndex={-1}
-              type="text"
-              value={username}
-            />
-            <span className="field-label">Basic auth helper</span>
-            <Input
-              autoComplete="current-password"
-              name="current-password"
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter your current password"
-              type="password"
-              value={password}
-            />
-          </form>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => resetForm("query")}
+              type="button"
+              variant="outline"
+            >
+              <Plus className="size-4" />
+              New endpoint
+            </Button>
+            <Button onClick={saveEndpoint} type="button">
+              {saveMutation.isPending ? "Saving..." : form.id ? "Update" : "Publish"}
+            </Button>
+          </div>
         }
-        description="Publish or revoke query endpoints, copy opaque invoke URLs, and generate the exact Basic Auth header inline from your current credentials."
+        description="Publish saved queries or pipelines explicitly, choose runtime auth, define supported params, and inspect invoke logs."
         label="Publish"
         title="Endpoints"
       />
 
-      {notice.kind !== "idle" && notice.message ? (
-        <NoticeAlert
-          kind={notice.kind === "success" ? "success" : "error"}
-          message={notice.message}
-        />
+      {notice.kind !== "idle" ? (
+        <InlineBanner tone={notice.kind === "success" ? "success" : "error"}>
+          {notice.message}
+        </InlineBanner>
       ) : null}
 
-      <section className="overflow-hidden rounded-[10px] border border-border bg-surface">
-        <Table className="min-w-[980px]">
-          <TableHeader className="[&_tr]:border-border">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="bg-surface-raised px-3 py-2 text-[11px] uppercase tracking-[0.08em] text-secondary">Public Invoke ID</TableHead>
-              <TableHead className="bg-surface-raised px-3 py-2 text-[11px] uppercase tracking-[0.08em] text-secondary">Label</TableHead>
-              <TableHead className="bg-surface-raised px-3 py-2 text-[11px] uppercase tracking-[0.08em] text-secondary">Linked Query</TableHead>
-              <TableHead className="bg-surface-raised px-3 py-2 text-[11px] uppercase tracking-[0.08em] text-secondary">Method</TableHead>
-              <TableHead className="bg-surface-raised px-3 py-2 text-[11px] uppercase tracking-[0.08em] text-secondary">Status</TableHead>
-              <TableHead className="bg-surface-raised px-3 py-2 text-[11px] uppercase tracking-[0.08em] text-secondary">Total Calls</TableHead>
-              <TableHead className="bg-surface-raised px-3 py-2 text-[11px] uppercase tracking-[0.08em] text-secondary">Last Called</TableHead>
-              <TableHead className="bg-surface-raised px-3 py-2 text-right text-[11px] uppercase tracking-[0.08em] text-secondary">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {endpointsQuery.isLoading
-              ? Array.from({ length: 6 }).map((_, index) => (
-                  <TableRow key={index} className="border-border hover:bg-transparent">
-                    <TableCell className="px-3 py-0" colSpan={8}>
-                      <div className="grid h-[42px] grid-cols-[2fr_1.2fr_1.8fr_0.7fr_0.9fr_0.9fr_1.4fr_220px] items-center gap-3">
-                        <Skeleton className="h-3.5 w-32" />
-                        <Skeleton className="h-3.5 w-24" />
-                        <Skeleton className="h-3.5 w-40" />
-                        <Skeleton className="h-5 w-14 rounded-full" />
-                        <Skeleton className="h-3.5 w-16" />
-                        <Skeleton className="h-3.5 w-16" />
-                        <Skeleton className="h-3.5 w-24" />
-                        <Skeleton className="h-3.5 w-36" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              : null}
+      <section className="stat-strip">
+        <div className="stat-cell">
+          <p className="page-label">Published routes</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {endpoints.filter((endpoint) => endpoint.isActive).length}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            {endpoints.length} total endpoints
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">API-key protected</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {endpoints.filter((endpoint) => endpoint.authMode === "api_key").length}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Scoped runtime auth enabled
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Legacy auth</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {endpoints.filter((endpoint) => endpoint.requiresMigration).length}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Review and migrate in-place
+          </p>
+        </div>
+        <div className="stat-cell">
+          <p className="page-label">Recent logs</p>
+          <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.05em]">
+            {formatNumber(logsQuery.data?.length ?? 0)}
+          </p>
+          <p className="mt-1 text-sm text-secondary">
+            Showing the last 100 runs for the selected endpoint
+          </p>
+        </div>
+      </section>
 
-            {!endpointsQuery.isLoading && (endpointsQuery.data ?? []).map((endpoint) => {
-              const helperOpen = helperEndpointId === endpoint.id
-              const invokeMethod = endpointMethod(endpoint)
-              const isActivating =
-                activateMutation.isPending && activateMutation.variables === endpoint.id
-              const isDeactivating =
-                deactivateMutation.isPending &&
-                deactivateMutation.variables === endpoint.id
-              const isDeleting =
-                deleteMutation.isPending && deleteMutation.variables === endpoint.id
-              const isBusy = isActivating || isDeactivating || isDeleting
-              const headerValue = password
-                ? `Authorization: Basic ${encodeBasicAuth(username, password)}`
-                : `Authorization: Basic <base64(${username}:your-password)>`
-              const invokeUrl = endpointUrl(endpoint.publicId)
-              const curlPreview = buildCurlPreview(invokeMethod, headerValue, invokeUrl)
-              const toggleHelper = () => {
-                setHelperEndpointId((current) => current === endpoint.id ? null : endpoint.id)
-              }
+      <section className="grid gap-5 xl:grid-cols-[minmax(360px,0.44fr)_minmax(0,0.56fr)]">
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="page-label">Publish endpoint</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                {form.id ? "Edit contract" : "New contract"}
+              </h2>
+            </div>
+          </div>
+          <div className="panel-body space-y-4">
+            <label className="grid gap-1.5">
+              <span className="field-label">Target type</span>
+              <select
+                className="field-select"
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    targetKind: event.target.value as EndpointTargetKind,
+                    targetId:
+                      event.target.value === "query"
+                        ? (queries[0]?.id ?? 0)
+                        : (pipelines[0]?.id ?? 0),
+                  }))
+                }
+                value={form.targetKind}
+              >
+                <option value="query">Saved query</option>
+                <option value="pipeline">Saved pipeline</option>
+              </select>
+            </label>
 
-              return (
-                <Fragment key={endpoint.id}>
-                  <TableRow
-                    className={cn(
-                      "cursor-pointer border-border transition-colors hover:bg-[color:color-mix(in_oklab,var(--foreground)_2.5%,transparent)]",
-                      helperOpen &&
-                        "bg-[color:color-mix(in_oklab,var(--accent)_7%,transparent)] shadow-[inset_2px_0_0_0_var(--accent-strong)]"
-                    )}
-                    onClick={(event) => {
-                      if (shouldIgnoreRowToggle(event.target)) {
-                        return
+            <label className="grid gap-1.5">
+              <span className="field-label">Target</span>
+              <select
+                className="field-select"
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    targetId: Number(event.target.value),
+                  }))
+                }
+                value={form.targetId}
+              >
+                {(form.targetKind === "query" ? queries : pipelines).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-1.5">
+              <span className="field-label">Endpoint name</span>
+              <Input
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, name: event.target.value }))
+                }
+                value={form.name}
+              />
+            </label>
+
+            <label className="grid gap-1.5">
+              <span className="field-label">Slug</span>
+              <Input
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, slug: event.target.value }))
+                }
+                placeholder="auto-generated if blank"
+                value={form.slug}
+              />
+            </label>
+
+            <label className="grid gap-1.5">
+              <span className="field-label">Auth mode</span>
+              <select
+                className="field-select"
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    authMode: event.target.value as EndpointAuthMode,
+                  }))
+                }
+                value={form.authMode}
+              >
+                {endpointAuthModeOptions
+                  .filter((option) => option.value !== "legacy_basic" || form.id)
+                  .map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+              </select>
+            </label>
+
+            <label className="grid gap-1.5">
+              <span className="field-label">Pagination</span>
+              <select
+                className="field-select"
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    paginationMode: event.target.value as EndpointPaginationMode,
+                  }))
+                }
+                value={form.paginationMode}
+              >
+                {endpointPaginationModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {form.paginationMode !== "none" ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="grid gap-1.5">
+                  <span className="field-label">Default page size</span>
+                  <Input
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        defaultPageSize: event.target.value,
+                      }))
+                    }
+                    value={form.defaultPageSize}
+                  />
+                </label>
+                <label className="grid gap-1.5">
+                  <span className="field-label">Max page size</span>
+                  <Input
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        maxPageSize: event.target.value,
+                      }))
+                    }
+                    value={form.maxPageSize}
+                  />
+                </label>
+                {form.paginationMode === "cursor" ? (
+                  <label className="grid gap-1.5 md:col-span-2">
+                    <span className="field-label">Cursor field</span>
+                    <Input
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          cursorField: event.target.value,
+                        }))
                       }
-
-                      toggleHelper()
-                    }}
-                  >
-                    <TableCell className="px-3">
-                      <button
-                        className="flex items-center gap-2 font-mono text-sm text-foreground"
-                        onClick={toggleHelper}
-                        type="button"
-                      >
-                        <span className="break-all text-left">{endpoint.publicId}</span>
-                        <Copy className="size-3.5 text-secondary" />
-                      </button>
-                    </TableCell>
-                    <TableCell className="px-3 text-sm">{endpoint.slug}</TableCell>
-                    <TableCell className="px-3 text-sm">
-                      {queryNameById.get(endpoint.queryId ?? -1) ?? "Endpoint draft"}
-                    </TableCell>
-                    <TableCell className="px-3">
-                      <MethodBadge method={invokeMethod} />
-                    </TableCell>
-                    <TableCell className="px-3">
-                      <EndpointStatusBadge isActive={endpoint.isActive} />
-                    </TableCell>
-                    <TableCell className="px-3 font-mono text-secondary">
-                      {formatNumber(mockCallCount(endpoint))}
-                    </TableCell>
-                    <TableCell className="px-3 font-mono text-secondary">
-                      {formatLastCalled(endpoint)}
-                    </TableCell>
-                    <TableCell className="px-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <Switch
-                                aria-label={`Toggle ${endpoint.slug} endpoint`}
-                                checked={endpoint.isActive}
-                                disabled={isBusy}
-                                onCheckedChange={(next) =>
-                                  next
-                                    ? activateMutation.mutate(endpoint.id)
-                                    : deactivateMutation.mutate(endpoint.id)
-                                }
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            {endpoint.isActive ? "Deactivate endpoint" : "Activate endpoint"}
-                          </TooltipContent>
-                        </Tooltip>
-                        <Button
-                          onClick={toggleHelper}
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <KeyRound className="size-4" />
-                          Auth
-                        </Button>
-                        <Button
-                          disabled={isDeleting}
-                          onClick={() => setEndpointPendingDelete(endpoint)}
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <Trash2 className="size-4" />
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {helperOpen ? (
-                    <TableRow className="border-border bg-surface-raised hover:bg-surface-raised">
-                      <TableCell className="px-4 py-4" colSpan={8}>
-                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-                          <Card className="border border-border bg-surface py-0 shadow-none">
-                            <CardHeader className="border-b border-border py-4">
-                              <CardTitle className="text-base">Invoke details</CardTitle>
-                              <CardDescription>
-                                Copy the public ID, invoke URL, or auth header directly from here.
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4 py-4">
-                              <div className="grid gap-4 md:grid-cols-2">
-                                <div>
-                                  <p className="page-label">Opaque invoke ID</p>
-                                  <p className="mt-1 font-mono text-sm break-all">{endpoint.publicId}</p>
-                                </div>
-                                <div>
-                                  <p className="page-label">Method</p>
-                                  <div className="mt-1 flex items-center gap-2">
-                                    <MethodBadge method={invokeMethod} />
-                                    <span className="text-sm text-secondary">Saved endpoint contract</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div>
-                                <p className="page-label">Direct backend URL</p>
-                                <p className="mt-1 flex items-start gap-2 font-mono text-sm break-all">
-                                  <Link2 className="mt-0.5 size-4 shrink-0 text-secondary" />
-                                  <span>{invokeUrl}</span>
-                                </p>
-                              </div>
-                              <div>
-                                <p className="page-label">Authorization header</p>
-                                <p className="mt-1 flex items-start gap-2 font-mono text-sm break-all">
-                                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-secondary" />
-                                  <span>{headerValue}</span>
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <Button onClick={() => copyText(endpoint.publicId, "Endpoint invoke ID copied.")} size="sm" type="button" variant="outline">
-                                  Copy invoke ID
-                                </Button>
-                                <Button onClick={() => copyText(invokeUrl, "Direct backend URL copied.")} size="sm" type="button" variant="outline">
-                                  Copy backend URL
-                                </Button>
-                                <Button onClick={() => copyText(headerValue, "Authorization header copied.")} size="sm" type="button">
-                                  Copy header
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card className="border border-border bg-surface py-0 shadow-none">
-                            <CardHeader className="border-b border-border py-4">
-                              <CardTitle className="text-base">Request preview</CardTitle>
-                              <CardDescription>
-                                The public invoke endpoint keeps the saved method and Basic Auth contract.
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3 py-4">
-                              <Alert className="border-border bg-surface-raised">
-                                <ShieldCheck className="size-4" />
-                                <AlertTitle>Method-aware preview</AlertTitle>
-                                <AlertDescription>
-                                  SQL and pipeline endpoints stay <span className="font-mono">GET</span>. REST-backed endpoints mirror the saved REST method.
-                                </AlertDescription>
-                              </Alert>
-                              <pre className="overflow-x-auto rounded-lg border border-border bg-background px-4 py-4 font-mono text-sm text-secondary">
-                                {curlPreview}
-                              </pre>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </Fragment>
-              )
-            })}
-
-            {!endpointsQuery.isLoading && (endpointsQuery.data?.length ?? 0) === 0 ? (
-              <TableRow className="border-border hover:bg-transparent">
-                <TableCell className="py-14 text-center text-sm text-secondary" colSpan={8}>
-                  No endpoints yet. Save a query to create an endpoint draft.
-                </TableCell>
-              </TableRow>
+                      placeholder="id"
+                      value={form.cursorField}
+                    />
+                  </label>
+                ) : null}
+              </div>
             ) : null}
-          </TableBody>
-        </Table>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="field-label">Parameters</p>
+                  <p className="text-sm text-secondary">
+                    Define supported named params like `class_id`, `page`, or
+                    `cursor`.
+                  </p>
+                </div>
+                <Button
+                  onClick={() =>
+                    setForm((current) => ({
+                      ...current,
+                      parameters: addParameter(current.parameters),
+                    }))
+                  }
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Add param
+                </Button>
+              </div>
+
+              {form.parameters.length === 0 ? (
+                <div className="rounded-[8px] border border-border px-3 py-3 text-sm text-secondary">
+                  No explicit parameters yet. Requests can still send pagination
+                  params if pagination is enabled.
+                </div>
+              ) : null}
+
+              {form.parameters.map((parameter, index) => (
+                <div
+                  key={`${parameter.name}-${index}`}
+                  className="grid gap-3 rounded-[8px] border border-border px-3 py-3"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Input
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          parameters: current.parameters.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, name: event.target.value }
+                              : item
+                          ),
+                        }))
+                      }
+                      placeholder="name"
+                      value={parameter.name}
+                    />
+                    <Input
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          parameters: current.parameters.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, label: event.target.value }
+                              : item
+                          ),
+                        }))
+                      }
+                      placeholder="label"
+                      value={parameter.label ?? ""}
+                    />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                    <Input
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          parameters: current.parameters.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, defaultValue: event.target.value }
+                              : item
+                          ),
+                        }))
+                      }
+                      placeholder="default value"
+                      value={parameter.defaultValue ?? ""}
+                    />
+                    <select
+                      className="field-select"
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          parameters: current.parameters.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, location: event.target.value }
+                              : item
+                          ),
+                        }))
+                      }
+                      value={parameter.location ?? "query"}
+                    >
+                      <option value="query">Query string</option>
+                      <option value="body">JSON body</option>
+                      <option value="any">Either</option>
+                    </select>
+                    <Button
+                      onClick={() =>
+                        setForm((current) => ({
+                          ...current,
+                          parameters: current.parameters.filter(
+                            (_, itemIndex) => itemIndex !== index
+                          ),
+                        }))
+                      }
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-secondary">
+                    <input
+                      checked={Boolean(parameter.required)}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          parameters: current.parameters.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, required: event.target.checked }
+                              : item
+                          ),
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    Required
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="page-label">Published endpoints</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                Contracts
+              </h2>
+            </div>
+          </div>
+          <div className="panel-body space-y-4">
+            {endpointsQuery.isLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-24 w-full" />
+              ))
+            ) : null}
+
+            {endpoints.map((endpoint) => (
+              <article
+                key={endpoint.id}
+                className="rounded-[10px] border border-border px-4 py-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{endpoint.name}</p>
+                      <StatusBadge
+                        label={endpoint.isActive ? "Active" : "Draft"}
+                        tone={endpoint.isActive ? "success" : "muted"}
+                      />
+                      {endpoint.requiresMigration ? (
+                        <StatusBadge label="Legacy auth" tone="warning" />
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-sm text-secondary">
+                      {endpoint.slug} • {targetLabel(endpoint, queryMap, pipelineMap)}
+                    </p>
+                    <p className="mt-1 text-xs text-secondary">
+                      {endpoint.invokeMethod ?? "GET"} • {endpoint.authMode} •{" "}
+                      {endpoint.paginationMode}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() =>
+                        activateMutation.mutate(endpoint)
+                      }
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {endpoint.isActive ? "Deactivate" : "Activate"}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setForm(formFromEndpoint(endpoint))
+                        setSelectedEndpointId(endpoint.id)
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      onClick={() => setEndpointPendingDelete(endpoint)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 rounded-[8px] border border-border px-3 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="page-label">Invoke URL</p>
+                      <p className="mt-1 font-mono text-sm break-all">
+                        {endpointUrl(endpoint.publicId)}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() =>
+                        copyText(
+                          endpointUrl(endpoint.publicId),
+                          "Invoke URL copied."
+                        )
+                      }
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                  <div>
+                    <p className="page-label">Request preview</p>
+                    <pre className="mt-1 overflow-x-auto rounded-[8px] bg-surface-raised px-3 py-3 text-xs text-secondary">
+                      {buildCurlPreview(endpoint)}
+                    </pre>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() =>
+                        setSelectedEndpointId((current) =>
+                          current === endpoint.id ? null : endpoint.id
+                        )
+                      }
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {selectedEndpointId === endpoint.id ? "Hide logs" : "Show logs"}
+                    </Button>
+                  </div>
+                </div>
+
+                {selectedEndpointId === endpoint.id ? (
+                  <div className="mt-4 space-y-3">
+                    <p className="page-label">Execution logs</p>
+                    {logsQuery.isLoading ? (
+                      <Skeleton className="h-32 w-full" />
+                    ) : (logsQuery.data ?? []).length === 0 ? (
+                      <div className="rounded-[8px] border border-border px-3 py-3 text-sm text-secondary">
+                        No execution logs yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {(logsQuery.data ?? []).map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-[8px] border border-border px-3 py-3 text-sm"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <StatusBadge
+                                label={String(item.statusCode)}
+                                tone={item.statusCode < 400 ? "success" : "error"}
+                              />
+                              <span className="text-secondary">
+                                {item.authMode}
+                                {item.apiKeyPrefix ? ` • ${item.apiKeyPrefix}` : ""}
+                              </span>
+                              <span className="text-secondary">
+                                {item.durationMs} ms • {item.rowCount} rows
+                              </span>
+                            </div>
+                            <p className="mt-1 text-secondary">
+                              {formatUtcDateTime(item.ranAt, {
+                                includeSeconds: true,
+                              })}
+                            </p>
+                            {item.errorExcerpt ? (
+                              <p className="mt-2 text-[color:var(--danger)]">
+                                {item.errorExcerpt}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+
+            {!endpointsQuery.isLoading && endpoints.length === 0 ? (
+              <div className="rounded-[10px] border border-border px-4 py-4 text-sm text-secondary">
+                No endpoints published yet. Save a query or pipeline first, then
+                publish it here explicitly.
+              </div>
+            ) : null}
+          </div>
+        </article>
       </section>
 
       <ConfirmActionDialog
         confirmLabel="Delete endpoint"
-        description={endpointPendingDelete ? `This removes the endpoint ${endpointPendingDelete.name}.` : ""}
+        description={
+          endpointPendingDelete
+            ? `This removes ${endpointPendingDelete.name} and its execution history.`
+            : ""
+        }
         onConfirm={() => {
           if (!endpointPendingDelete) {
             return
           }
-
           deleteMutation.mutate(endpointPendingDelete.id)
         }}
         onOpenChange={(open) => {

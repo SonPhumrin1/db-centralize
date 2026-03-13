@@ -1,7 +1,7 @@
 "use client"
 
 import { LogOut } from "lucide-react"
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
 
 import { signOut } from "@/app/(auth)/login/actions"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
@@ -80,12 +80,14 @@ export function DashboardShell({
 
   const expanded =
     mode === "auto"
-      ? hovered || (keyboardFocusWithin && inputMethodRef.current === "keyboard")
+      ? hovered ||
+        (keyboardFocusWithin && inputMethodRef.current === "keyboard")
       : !manualCollapsed
   const sidebarPanelWidth = expanded
     ? expandedSidebarPanelWidth
     : collapsedSidebarPanelWidth
   const sidebarRailWidth = collapsedSidebarPanelWidth + sidebarInset
+  const contentOffset = Math.max(sidebarPanelWidth - sidebarRailWidth, 0)
 
   return (
     <div className="app-shell md:flex md:gap-4 lg:gap-5">
@@ -109,11 +111,18 @@ export function DashboardShell({
         username={username}
       />
 
-      <div className="content-shell min-w-0 flex-1">
+      <div
+        className="content-shell min-w-0 flex-1 transition-[padding-left] duration-260 ease-[cubic-bezier(0.22,1,0.36,1)] md:pl-[var(--sidebar-content-offset)]"
+        style={
+          {
+            "--sidebar-content-offset": `${contentOffset}px`,
+          } as CSSProperties
+        }
+      >
         <div className="border-b border-border px-4 py-3 md:hidden">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-secondary">
+              <p className="font-mono text-[11px] tracking-[0.12em] text-secondary uppercase">
                 {platformName}
               </p>
               <p className="text-sm font-medium">{username}</p>
@@ -121,7 +130,13 @@ export function DashboardShell({
             <div className="flex items-center gap-1">
               {isAdmin ? <ThemeToggle /> : null}
               <form action={signOut}>
-                <Button size="icon-sm" type="submit" variant="ghost">
+                <Button
+                  aria-label="Sign out"
+                  size="icon-sm"
+                  title="Sign out"
+                  type="submit"
+                  variant="ghost"
+                >
                   <LogOut className="size-4" />
                 </Button>
               </form>

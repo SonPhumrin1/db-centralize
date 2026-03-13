@@ -44,6 +44,11 @@ type RunQueryInput struct {
 	Body         string `json:"body"`
 }
 
+type QueryRunOptions struct {
+	Params   map[string]any
+	RowLimit int
+}
+
 type QueryView struct {
 	ID           uint      `json:"id"`
 	DataSourceID uint      `json:"dataSourceId"`
@@ -154,11 +159,6 @@ func (u *QueryUsecase) Create(ctx context.Context, userID uint, input CreateQuer
 		return nil, err
 	}
 
-	if err := u.createEndpointForQuery(ctx, userID, query); err != nil {
-		_ = u.queryRepo.Delete(ctx, query.ID, userID)
-		return nil, err
-	}
-
 	view := toQueryView(*query)
 	return &view, nil
 }
@@ -204,7 +204,7 @@ func (u *QueryUsecase) Run(ctx context.Context, id, userID uint) ([]map[string]a
 		return nil, err
 	}
 
-	return u.executeAgainstSource(ctx, *source, query.Body)
+	return u.executeAgainstSource(ctx, *source, query.Body, QueryRunOptions{})
 }
 
 func (u *QueryUsecase) RunInput(ctx context.Context, userID uint, input RunQueryInput) ([]map[string]any, error) {
@@ -217,7 +217,21 @@ func (u *QueryUsecase) RunInput(ctx context.Context, userID uint, input RunQuery
 		return nil, ErrEmptyQueryBody
 	}
 
-	return u.executeAgainstSource(ctx, *source, input.Body)
+	return u.executeAgainstSource(ctx, *source, input.Body, QueryRunOptions{})
+}
+
+func (u *QueryUsecase) RunSavedWithOptions(ctx context.Context, id, userID uint, options QueryRunOptions) ([]map[string]any, error) {
+	query, err := u.queryRepo.FindByID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	source, err := u.dataSourceRepo.FindByID(ctx, query.DataSourceID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.executeAgainstSource(ctx, *source, query.Body, options)
 }
 
 func (u *QueryUsecase) buildQueryModel(
@@ -254,26 +268,26 @@ func (u *QueryUsecase) buildQueryModel(
 	}, nil
 }
 
-func (u *QueryUsecase) executeAgainstSource(ctx context.Context, source model.DataSource, body string) ([]map[string]any, error) {
+func (u *QueryUsecase) executeAgainstSource(ctx context.Context, source model.DataSource, body string, options QueryRunOptions) ([]map[string]any, error) {
 	if strings.TrimSpace(body) == "" {
 		return nil, ErrEmptyQueryBody
 	}
 
 	switch source.Type {
 	case model.DataSourceTypePostgres, model.DataSourceTypeMySQL:
-		return u.RunAgainstSource(ctx, source, body)
+		return u.RunAgainstSource(ctx, source, body, options)
 	case model.DataSourceTypeREST:
 		request, err := restrequest.Parse(body)
 		if err != nil {
 			return nil, err
 		}
-		return u.FetchREST(ctx, source, request)
+		return u.FetchREST(ctx, source, request, options)
 	default:
 		return nil, ErrUnsupportedDataSourceType
 	}
 }
 
-func (u *QueryUsecase) RunAgainstSource(ctx context.Context, source model.DataSource, queryBody string) ([]map[string]any, error) {
+func (u *QueryUsecase) RunAgainstSource(ctx context.Context, source model.DataSource, queryBody string, options QueryRunOptions) ([]map[string]any, error) {
 	config, err := decryptDataSourceConfig(u.encryptionKey, source.ConfigEncrypted)
 	if err != nil {
 		return nil, err
@@ -285,13 +299,19 @@ func (u *QueryUsecase) RunAgainstSource(ctx context.Context, source model.DataSo
 	}
 	defer closeFn()
 
-	rows, err := db.WithContext(ctx).Raw(queryBody).Rows()
+	normalizedQuery := normalizeNamedQuery(queryBody)
+	args := namedArguments(options.Params)
+	rows, err := db.WithContext(ctx).Raw(normalizedQuery, args...).Rows()
 	if err != nil {
 		return nil, fmt.Errorf("run query: %w", err)
 	}
 	defer rows.Close()
 
-	result, err := scanRowsToMap(rows, queryResultRowLimit)
+	rowLimit := options.RowLimit
+	if rowLimit <= 0 {
+		rowLimit = queryResultRowLimit
+	}
+	result, err := scanRowsToMap(rows, rowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -300,8 +320,8 @@ func (u *QueryUsecase) RunAgainstSource(ctx context.Context, source model.DataSo
 	return result, nil
 }
 
-func (u *QueryUsecase) FetchREST(ctx context.Context, source model.DataSource, request restrequest.Request) ([]map[string]any, error) {
-	rows, err := u.restAdapter.Execute(ctx, source, request)
+func (u *QueryUsecase) FetchREST(ctx context.Context, source model.DataSource, request restrequest.Request, options QueryRunOptions) ([]map[string]any, error) {
+	rows, err := u.restAdapter.Execute(ctx, source, applyRESTRuntimeParams(request, options.Params))
 	if err != nil {
 		return nil, err
 	}
@@ -316,22 +336,6 @@ func (u *QueryUsecase) touchDataSourceActivity(ctx context.Context, source model
 	}
 
 	_ = u.dataSourceRepo.UpdateLastQueried(ctx, source.ID, source.UserID, time.Now().UTC())
-}
-
-func (u *QueryUsecase) createEndpointForQuery(ctx context.Context, userID uint, query *model.Query) error {
-	slug, err := generateUniqueSlug(ctx, query.Name, u.endpointRepo)
-	if err != nil {
-		return err
-	}
-
-	return u.endpointRepo.Create(ctx, &model.Endpoint{
-		UserID:    userID,
-		QueryID:   &query.ID,
-		Name:      query.Name,
-		Slug:      slug,
-		IsActive:  false,
-		CreatedAt: time.Now().UTC(),
-	})
 }
 
 func toQueryView(query model.Query) QueryView {

@@ -6,3 +6,10 @@ export async function GET(request: Request) {
     request,
   })
 }
+
+export async function POST(request: Request) {
+  return forwardToBackend({
+    path: "/api/v1/endpoints",
+    request,
+  })
+}

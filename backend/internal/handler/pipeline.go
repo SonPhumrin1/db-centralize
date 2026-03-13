@@ -146,6 +146,28 @@ func (h *PipelineHandler) Run(c fiber.Ctx) error {
 	return c.JSON(rows)
 }
 
+func (h *PipelineHandler) RunDraft(c fiber.Ctx) error {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return unauthorized(c)
+	}
+
+	var input usecase.RunDraftPipelineInput
+	if err := json.Unmarshal(c.Body(), &input); err != nil {
+		return invalidJSONBody(c)
+	}
+	if errs := validateRunDraftPipelineInput(input); errs.HasAny() {
+		return validationFailed(c, errs...)
+	}
+
+	rows, err := h.usecase.RunDraft(c.Context(), userID, input)
+	if err != nil {
+		return mapPipelineError(c, err)
+	}
+
+	return c.JSON(rows)
+}
+
 func mapPipelineError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, repository.ErrForbidden):

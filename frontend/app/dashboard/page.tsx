@@ -172,7 +172,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <div className="panel">
+        <div className="panel overflow-hidden">
           <div className="panel-header">
             <div>
               <p className="page-label">Activity</p>
@@ -201,7 +201,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel overflow-hidden">
           <div className="panel-header">
             <div>
               <p className="page-label">Quick links</p>

@@ -39,6 +39,7 @@ import {
 } from "@/lib/datasources"
 import {
   buildSqlAutocompleteSchema,
+  inferDefaultSqlTable,
   type QueryResultRow,
   type RunQueryInput,
   type SavedQuery,
@@ -295,7 +296,7 @@ export function QueriesWorkspace() {
         body: savedQuery.body,
         restRequest: parseRestRequestBody(savedQuery.body),
       })
-      setNotice({ kind: "success", message: selectedQueryId ? "Query updated." : "Query saved and endpoint draft created." })
+      setNotice({ kind: "success", message: selectedQueryId ? "Query updated." : "Query saved." })
       await queryClient.invalidateQueries({ queryKey: ["queries"] })
     },
     onError: (error) => {
@@ -351,8 +352,14 @@ export function QueriesWorkspace() {
       return []
     }
 
-    return [sql({ schema: buildSqlAutocompleteSchema(schemaQuery.data), upperCaseKeywords: true })]
-  }, [schemaQuery.data, selectedSource])
+    return [
+      sql({
+        schema: buildSqlAutocompleteSchema(schemaQuery.data),
+        defaultTable: inferDefaultSqlTable(draft.body, schemaQuery.data),
+        upperCaseKeywords: true,
+      }),
+    ]
+  }, [draft.body, schemaQuery.data, selectedSource])
 
   const rawColumns = useMemo(() => {
     const keys = new Set<string>()
@@ -618,7 +625,7 @@ export function QueriesWorkspace() {
                   ))}
                 </div>
               ) : (queriesQuery.data ?? []).length === 0 ? (
-                <EmptyState message="Save a query to keep it here and auto-create its inactive endpoint draft." />
+                <EmptyState message="Save a query to keep it here, then publish an endpoint separately from the Endpoints workspace." />
               ) : (
                 <div className="divide-y divide-border">
                   {(queriesQuery.data ?? []).map((query) => {
@@ -1108,7 +1115,7 @@ export function QueriesWorkspace() {
                     </div>
                   </div>
                   <div className="rounded-[8px] border border-border px-4 py-4 text-sm text-secondary">
-                    Saving this query keeps the current source binding and backend behavior that auto-creates an inactive endpoint draft.
+                    Saving this query keeps the current source binding only. Publishing an endpoint now happens explicitly from the Endpoints workspace.
                   </div>
                 </div>
               ) : null}
@@ -1119,7 +1126,7 @@ export function QueriesWorkspace() {
 
       <ConfirmActionDialog
         confirmLabel="Delete query"
-        description={queryPendingDelete ? `This removes ${queryPendingDelete.name} and its linked endpoint draft.` : ""}
+        description={queryPendingDelete ? `This removes ${queryPendingDelete.name}. Any separately published endpoints must be removed from the Endpoints workspace.` : ""}
         onConfirm={() => {
           if (!queryPendingDelete) {
             return

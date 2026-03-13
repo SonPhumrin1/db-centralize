@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"dataplatform/backend/internal/model"
 	"gorm.io/gorm"
@@ -37,6 +38,7 @@ func (r *endpointRepository) FindAll(ctx context.Context, userID uint) ([]model.
 		Order("created_at DESC").
 		Preload("Query").
 		Preload("Query.DataSource").
+		Preload("Pipeline").
 		Find(&endpoints).Error; err != nil {
 		return nil, fmt.Errorf("find endpoints: %w", err)
 	}
@@ -48,6 +50,9 @@ func (r *endpointRepository) FindByID(ctx context.Context, id, userID uint) (*mo
 	var endpoint model.Endpoint
 	if err := r.db.WithContext(ctx).
 		Where("id = ? AND user_id = ?", id, userID).
+		Preload("Query").
+		Preload("Query.DataSource").
+		Preload("Pipeline").
 		First(&endpoint).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ownershipScopedError(ctx, r.db, &model.Endpoint{}, "id = ?", id)
@@ -62,6 +67,9 @@ func (r *endpointRepository) FindByPublicID(ctx context.Context, publicID string
 	var endpoint model.Endpoint
 	if err := r.db.WithContext(ctx).
 		Where("public_id = ?", publicID).
+		Preload("Query").
+		Preload("Query.DataSource").
+		Preload("Pipeline").
 		First(&endpoint).Error; err != nil {
 		return nil, err
 	}
@@ -73,6 +81,9 @@ func (r *endpointRepository) FindByPipelineID(ctx context.Context, pipelineID, u
 	var endpoint model.Endpoint
 	if err := r.db.WithContext(ctx).
 		Where("pipeline_id = ? AND user_id = ?", pipelineID, userID).
+		Preload("Query").
+		Preload("Query.DataSource").
+		Preload("Pipeline").
 		First(&endpoint).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ownershipScopedError(ctx, r.db, &model.Endpoint{}, "pipeline_id = ?", pipelineID)
@@ -84,6 +95,11 @@ func (r *endpointRepository) FindByPipelineID(ctx context.Context, pipelineID, u
 }
 
 func (r *endpointRepository) Create(ctx context.Context, endpoint *model.Endpoint) error {
+	if endpoint.CreatedAt.IsZero() {
+		endpoint.CreatedAt = time.Now().UTC()
+	}
+	endpoint.UpdatedAt = endpoint.CreatedAt
+
 	if err := r.db.WithContext(ctx).Create(endpoint).Error; err != nil {
 		return fmt.Errorf("create endpoint: %w", err)
 	}
@@ -92,15 +108,22 @@ func (r *endpointRepository) Create(ctx context.Context, endpoint *model.Endpoin
 }
 
 func (r *endpointRepository) Update(ctx context.Context, endpoint *model.Endpoint) error {
+	endpoint.UpdatedAt = time.Now().UTC()
+
 	result := r.db.WithContext(ctx).
 		Model(&model.Endpoint{}).
 		Where("id = ? AND user_id = ?", endpoint.ID, endpoint.UserID).
 		Updates(map[string]any{
-			"name":        endpoint.Name,
-			"slug":        endpoint.Slug,
-			"is_active":   endpoint.IsActive,
-			"query_id":    endpoint.QueryID,
-			"pipeline_id": endpoint.PipelineID,
+			"name":            endpoint.Name,
+			"slug":            endpoint.Slug,
+			"auth_mode":       endpoint.AuthMode,
+			"parameters_json": endpoint.ParametersJSON,
+			"pagination_mode": endpoint.PaginationMode,
+			"pagination_json": endpoint.PaginationJSON,
+			"is_active":       endpoint.IsActive,
+			"query_id":        endpoint.QueryID,
+			"pipeline_id":     endpoint.PipelineID,
+			"updated_at":      endpoint.UpdatedAt,
 		})
 	if result.Error != nil {
 		return fmt.Errorf("update endpoint: %w", result.Error)

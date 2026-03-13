@@ -10,9 +10,5 @@ export default async function EndpointsPage() {
     redirect("/login")
   }
 
-  return (
-    <EndpointsWorkspace
-      username={session.user.username ?? session.user.email ?? "root"}
-    />
-  )
+  return <EndpointsWorkspace />
 }

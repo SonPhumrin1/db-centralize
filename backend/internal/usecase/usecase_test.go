@@ -139,8 +139,13 @@ func TestQueryAndEndpointUsecasesWithRESTSource(t *testing.T) {
 	dataSourceRepo := repository.NewDataSourceRepository(db)
 	queryRepo := repository.NewQueryRepository(db)
 	endpointRepo := repository.NewEndpointRepository(db)
+	endpointLogRepo := repository.NewEndpointExecutionLogRepository(db)
+	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
+	pipelineRepo := repository.NewPipelineRepository(db)
+	telegramRepo := repository.NewTelegramIntegrationRepository(db)
 	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
-	endpointUC := NewEndpointUsecase(endpointRepo, queryUC)
+	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
+	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -161,14 +166,6 @@ func TestQueryAndEndpointUsecasesWithRESTSource(t *testing.T) {
 		t.Fatalf("create query: %v", err)
 	}
 
-	var endpoint model.Endpoint
-	if err := db.Where("query_id = ?", query.ID).First(&endpoint).Error; err != nil {
-		t.Fatalf("load endpoint: %v", err)
-	}
-	if endpoint.PublicID == "" {
-		t.Fatalf("expected endpoint public id to be generated")
-	}
-
 	rows, err := queryUC.Run(ctx, query.ID, owner.ID)
 	if err != nil {
 		t.Fatalf("run query: %v", err)
@@ -186,21 +183,36 @@ func TestQueryAndEndpointUsecasesWithRESTSource(t *testing.T) {
 		t.Fatalf("update query failed: err=%v query=%#v", err, updated)
 	}
 
-	active, err := endpointUC.Activate(ctx, endpoint.ID, owner.ID)
+	createdEndpoint, err := endpointUC.Create(ctx, owner.ID, CreateEndpointInput{
+		TargetKind:     EndpointTargetKindQuery,
+		TargetID:       query.ID,
+		Name:           "Inventory sync endpoint",
+		AuthMode:       model.EndpointAuthModeNone,
+		PaginationMode: model.EndpointPaginationModeNone,
+	})
+	if err != nil {
+		t.Fatalf("create endpoint: %v", err)
+	}
+	if createdEndpoint.PublicID == "" {
+		t.Fatalf("expected endpoint public id to be generated")
+	}
+
+	active, err := endpointUC.Activate(ctx, createdEndpoint.ID, owner.ID)
 	if err != nil || !active.IsActive {
 		t.Fatalf("activate endpoint failed: err=%v endpoint=%#v", err, active)
 	}
 
-	loadedEndpoint, err := endpointRepo.FindByID(ctx, endpoint.ID, owner.ID)
+	loadedEndpoint, err := endpointRepo.FindByID(ctx, createdEndpoint.ID, owner.ID)
 	if err != nil {
 		t.Fatalf("load endpoint after activate: %v", err)
 	}
-	rows, err = endpointUC.Invoke(ctx, *loadedEndpoint)
+	invokeResult, err := endpointUC.Invoke(ctx, *loadedEndpoint, nil)
 	if err != nil {
 		t.Fatalf("invoke endpoint: %v", err)
 	}
-	if len(rows) != 1 {
-		t.Fatalf("unexpected endpoint rows: %#v", rows)
+	payloadRows, ok := invokeResult.Payload.([]map[string]any)
+	if !ok || len(payloadRows) != 1 {
+		t.Fatalf("unexpected endpoint rows: %#v", invokeResult.Payload)
 	}
 
 	if _, err := queryUC.Update(ctx, query.ID, other.ID, UpdateQueryInput{
@@ -211,7 +223,7 @@ func TestQueryAndEndpointUsecasesWithRESTSource(t *testing.T) {
 		t.Fatalf("expected forbidden update, got %v", err)
 	}
 
-	if err := endpointUC.Delete(ctx, endpoint.ID, owner.ID); err != nil {
+	if err := endpointUC.Delete(ctx, createdEndpoint.ID, owner.ID); err != nil {
 		t.Fatalf("delete endpoint: %v", err)
 	}
 	if err := queryUC.Delete(ctx, query.ID, owner.ID); err != nil {
@@ -267,6 +279,102 @@ func TestQueryUsecaseRunStructuredRESTRequest(t *testing.T) {
 	}
 }
 
+func TestEndpointCreateRejectsPaginationMismatchForSQLQuery(t *testing.T) {
+	t.Parallel()
+
+	db := testutil.OpenTestDB(t)
+	ctx := context.Background()
+
+	dataSourceRepo := repository.NewDataSourceRepository(db)
+	queryRepo := repository.NewQueryRepository(db)
+	endpointRepo := repository.NewEndpointRepository(db)
+	endpointLogRepo := repository.NewEndpointExecutionLogRepository(db)
+	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
+	pipelineRepo := repository.NewPipelineRepository(db)
+	telegramRepo := repository.NewTelegramIntegrationRepository(db)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
+	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
+
+	owner := testutil.MustCreateUser(t, db, testutil.UserSeed{Username: "owner-endpoint-pagination-mismatch"})
+	source := seedSQLSource(t, db, owner.ID, model.DataSourceTypePostgres)
+	query, err := queryUC.Create(ctx, owner.ID, CreateQueryInput{
+		DataSourceID: source.ID,
+		Name:         "Paged orders",
+		Body:         "SELECT id FROM orders ORDER BY id LIMIT :page_size OFFSET :offset",
+	})
+	if err != nil {
+		t.Fatalf("create query: %v", err)
+	}
+
+	_, err = endpointUC.Create(ctx, owner.ID, CreateEndpointInput{
+		TargetKind:     EndpointTargetKindQuery,
+		TargetID:       query.ID,
+		Name:           "Orders endpoint",
+		AuthMode:       model.EndpointAuthModeNone,
+		PaginationMode: model.EndpointPaginationModeNone,
+	})
+	if !errors.Is(err, ErrEndpointQueryPagination) {
+		t.Fatalf("expected pagination mismatch error, got %v", err)
+	}
+}
+
+func TestEndpointInvokeRejectsLegacyPaginationMismatchForSQLQuery(t *testing.T) {
+	t.Parallel()
+
+	db := testutil.OpenTestDB(t)
+	ctx := context.Background()
+
+	dataSourceRepo := repository.NewDataSourceRepository(db)
+	queryRepo := repository.NewQueryRepository(db)
+	endpointRepo := repository.NewEndpointRepository(db)
+	endpointLogRepo := repository.NewEndpointExecutionLogRepository(db)
+	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
+	pipelineRepo := repository.NewPipelineRepository(db)
+	telegramRepo := repository.NewTelegramIntegrationRepository(db)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
+	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
+
+	owner := testutil.MustCreateUser(t, db, testutil.UserSeed{Username: "owner-endpoint-pagination-invoke"})
+	source := seedSQLSource(t, db, owner.ID, model.DataSourceTypePostgres)
+	query, err := queryUC.Create(ctx, owner.ID, CreateQueryInput{
+		DataSourceID: source.ID,
+		Name:         "Legacy paged orders",
+		Body:         "SELECT id FROM orders ORDER BY id LIMIT :page_size OFFSET :offset",
+	})
+	if err != nil {
+		t.Fatalf("create query: %v", err)
+	}
+
+	endpoint := &model.Endpoint{
+		UserID:         owner.ID,
+		QueryID:        &query.ID,
+		Name:           "Legacy endpoint",
+		PublicID:       "legacy-endpoint",
+		Slug:           "legacy-endpoint",
+		AuthMode:       model.EndpointAuthModeNone,
+		ParametersJSON: "[]",
+		PaginationMode: model.EndpointPaginationModeNone,
+		PaginationJSON: "{}",
+		IsActive:       true,
+		CreatedAt:      time.Now().UTC(),
+	}
+	if err := db.Create(endpoint).Error; err != nil {
+		t.Fatalf("create endpoint: %v", err)
+	}
+
+	loaded, err := endpointRepo.FindByID(ctx, endpoint.ID, owner.ID)
+	if err != nil {
+		t.Fatalf("load endpoint: %v", err)
+	}
+
+	_, err = endpointUC.Invoke(ctx, *loaded, nil)
+	if !errors.Is(err, ErrEndpointQueryPagination) {
+		t.Fatalf("expected pagination mismatch error on invoke, got %v", err)
+	}
+}
+
 func TestPipelineUsecaseCreateRunAndDelete(t *testing.T) {
 	t.Parallel()
 
@@ -276,10 +384,13 @@ func TestPipelineUsecaseCreateRunAndDelete(t *testing.T) {
 	dataSourceRepo := repository.NewDataSourceRepository(db)
 	queryRepo := repository.NewQueryRepository(db)
 	endpointRepo := repository.NewEndpointRepository(db)
+	endpointLogRepo := repository.NewEndpointExecutionLogRepository(db)
 	pipelineRepo := repository.NewPipelineRepository(db)
 	telegramRepo := repository.NewTelegramIntegrationRepository(db)
+	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
 	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
 	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
+	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -303,12 +414,8 @@ func TestPipelineUsecaseCreateRunAndDelete(t *testing.T) {
 		t.Fatalf("create pipeline: %v", err)
 	}
 
-	endpoint, err := endpointRepo.FindByPipelineID(ctx, pipeline.ID, owner.ID)
-	if err != nil {
-		t.Fatalf("expected synced endpoint: %v", err)
-	}
-	if endpoint.IsActive {
-		t.Fatalf("expected pipeline endpoint to start inactive")
+	if _, err := endpointRepo.FindByPipelineID(ctx, pipeline.ID, owner.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected no auto-created endpoint, got %v", err)
 	}
 
 	rows, err := pipelineUC.Run(ctx, pipeline.ID, owner.ID)
@@ -324,24 +431,33 @@ func TestPipelineUsecaseCreateRunAndDelete(t *testing.T) {
 		t.Fatalf("unexpected pipeline list: err=%v items=%#v", err, items)
 	}
 
-	noExposeCanvas := `{"nodes":[{"id":"source-1","type":"source","data":{"sourceId":` +
-		uintString(source.ID) +
-		`,"queryBody":"/rows"}},{"id":"output-1","type":"output","data":{"label":"Internal"}}],"edges":[{"id":"edge-1","source":"source-1","target":"output-1"}]}`
 	if _, err := pipelineUC.Update(ctx, pipeline.ID, owner.ID, UpdatePipelineInput{
 		Name:       "Revenue mesh v2",
-		CanvasJSON: noExposeCanvas,
+		CanvasJSON: canvas,
 	}); err != nil {
 		t.Fatalf("update pipeline: %v", err)
 	}
-	if _, err := endpointRepo.FindByPipelineID(ctx, pipeline.ID, owner.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
-		t.Fatalf("expected pipeline endpoint removal, got %v", err)
+
+	explicitEndpoint, err := endpointUC.Create(ctx, owner.ID, CreateEndpointInput{
+		TargetKind:     EndpointTargetKindPipeline,
+		TargetID:       pipeline.ID,
+		Name:           "Revenue mesh endpoint",
+		AuthMode:       model.EndpointAuthModeNone,
+		PaginationMode: model.EndpointPaginationModeNone,
+	})
+	if err != nil {
+		t.Fatalf("create explicit pipeline endpoint: %v", err)
 	}
 
 	if _, err := pipelineUC.Get(ctx, pipeline.ID, other.ID); !errors.Is(err, repository.ErrForbidden) {
 		t.Fatalf("expected forbidden pipeline get, got %v", err)
 	}
+
 	if err := pipelineUC.Delete(ctx, pipeline.ID, owner.ID); err != nil {
 		t.Fatalf("delete pipeline: %v", err)
+	}
+	if _, err := endpointRepo.FindByID(ctx, explicitEndpoint.ID, owner.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected linked endpoint removal on delete, got %v", err)
 	}
 }
 
@@ -688,6 +804,24 @@ func seedRESTSource(t *testing.T, gormDB *gorm.DB, userID uint, baseURL string) 
 	}
 	if err := gormDB.Create(source).Error; err != nil {
 		t.Fatalf("create rest source: %v", err)
+	}
+
+	return source
+}
+
+func seedSQLSource(t *testing.T, gormDB *gorm.DB, userID uint, sourceType string) *model.DataSource {
+	t.Helper()
+
+	source := &model.DataSource{
+		UserID:          userID,
+		Name:            "SQL source",
+		Type:            sourceType,
+		ConfigEncrypted: "{}",
+		Status:          model.DataSourceStatusConnected,
+		CreatedAt:       time.Now().UTC(),
+	}
+	if err := gormDB.Create(source).Error; err != nil {
+		t.Fatalf("create sql source: %v", err)
 	}
 
 	return source

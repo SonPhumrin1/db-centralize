@@ -53,7 +53,9 @@ export function PipelineConfigDrawer({
   sources,
   telegramIntegrations,
 }: PipelineConfigDrawerProps) {
-  const updateNodeConfig = usePipelineCanvasStore((state) => state.updateNodeConfig)
+  const updateNodeConfig = usePipelineCanvasStore(
+    (state) => state.updateNodeConfig
+  )
 
   if (!node) {
     return (
@@ -61,11 +63,41 @@ export function PipelineConfigDrawer({
         <div className="panel-header">
           <div>
             <p className="page-label">Node config</p>
-            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">Inspector</h2>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+              Inspector
+            </h2>
           </div>
         </div>
-        <div className="panel-body text-sm leading-7 text-secondary">
-          Click a node on the canvas to edit its configuration.
+        <div className="panel-body space-y-4">
+          <div className="bg-surface-raised rounded-[8px] border border-border px-4 py-4">
+            <p className="text-sm leading-7 text-secondary">
+              Select a node to edit its configuration. The inspector updates in
+              place so you can wire the flow and tune one step at a time.
+            </p>
+          </div>
+          <div className="grid gap-3">
+            <div className="rounded-[8px] border border-border px-4 py-3">
+              <p className="page-label">1. Start with a source</p>
+              <p className="mt-2 text-sm leading-6 text-secondary">
+                Add a source node and point it at a saved datasource or REST
+                request.
+              </p>
+            </div>
+            <div className="rounded-[8px] border border-border px-4 py-3">
+              <p className="page-label">2. Shape the rows</p>
+              <p className="mt-2 text-sm leading-6 text-secondary">
+                Chain filter, transform, or join nodes to prepare the payload
+                before output.
+              </p>
+            </div>
+            <div className="rounded-[8px] border border-border px-4 py-3">
+              <p className="page-label">3. Run drafts anytime</p>
+              <p className="mt-2 text-sm leading-6 text-secondary">
+                Run executes the current draft. Save only when you want to
+                persist the latest graph.
+              </p>
+            </div>
+          </div>
         </div>
       </aside>
     )
@@ -78,12 +110,14 @@ export function PipelineConfigDrawer({
     <aside className="panel h-full overflow-y-auto">
       <div className="panel-header">
         <div className="flex items-center gap-3">
-          <span className="inline-flex size-10 items-center justify-center border border-border bg-surface-raised text-[color:var(--accent)]">
+          <span className="bg-surface-raised inline-flex size-10 items-center justify-center border border-border text-[color:var(--accent)]">
             {icon}
           </span>
           <div>
             <p className="page-label">Node config</p>
-            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">{node.data.label}</h2>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+              {node.data.label}
+            </h2>
           </div>
         </div>
       </div>
@@ -98,11 +132,17 @@ export function PipelineConfigDrawer({
         ) : null}
 
         {node.data.kind === "filter" ? (
-          <FilterConfigSection node={node} updateNodeConfig={updateNodeConfig} />
+          <FilterConfigSection
+            node={node}
+            updateNodeConfig={updateNodeConfig}
+          />
         ) : null}
 
         {node.data.kind === "transform" ? (
-          <TransformConfigSection node={node} updateNodeConfig={updateNodeConfig} />
+          <TransformConfigSection
+            node={node}
+            updateNodeConfig={updateNodeConfig}
+          />
         ) : null}
 
         {node.data.kind === "join" ? (
@@ -114,7 +154,10 @@ export function PipelineConfigDrawer({
         ) : null}
 
         {node.data.kind === "output" ? (
-          <OutputConfigSection node={node} updateNodeConfig={updateNodeConfig} />
+          <OutputConfigSection
+            node={node}
+            updateNodeConfig={updateNodeConfig}
+          />
         ) : null}
 
         {node.data.kind === "telegram-trigger" ? (
@@ -151,7 +194,9 @@ function SourceConfigSection({
 }: {
   node: PipelineFlowNode
   sources: DataSource[]
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as SourceNodeConfig
   const selectedSource =
@@ -164,7 +209,9 @@ function SourceConfigSection({
         label="Data source"
         onChange={(event) =>
           updateNodeConfig<"source">(node.id, (current) => {
-            const nextSourceId = event.target.value ? Number(event.target.value) : null
+            const nextSourceId = event.target.value
+              ? Number(event.target.value)
+              : null
             const nextSource =
               sources.find((source) => source.id === nextSourceId) ?? null
 
@@ -191,10 +238,11 @@ function SourceConfigSection({
       </SelectField>
 
       {selectedSource?.type === "rest" ? (
-        <section className="rounded-[8px] border border-border bg-surface-raised px-4 py-4">
+        <section className="bg-surface-raised rounded-[8px] border border-border px-4 py-4">
           <p className="page-label">REST request</p>
           <p className="mt-2 text-sm leading-6 text-secondary">
-            Datasource auth stays on the source itself. Configure only request-specific overrides here.
+            Datasource auth stays on the source itself. Configure only
+            request-specific overrides here.
           </p>
           <div className="mt-4">
             <RestRequestBuilder
@@ -226,7 +274,8 @@ function SourceConfigSection({
 
       {selectedSource?.status === "token_expired" ? (
         <NoticeBox tone="warning">
-          This source reports an expired token. Update its credentials before running the pipeline.
+          This source reports an expired token. Update its credentials before
+          running the pipeline.
         </NoticeBox>
       ) : null}
     </section>
@@ -238,7 +287,9 @@ function FilterConfigSection({
   updateNodeConfig,
 }: {
   node: PipelineFlowNode
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as FilterNodeConfig
 
@@ -290,7 +341,9 @@ function TransformConfigSection({
   updateNodeConfig,
 }: {
   node: PipelineFlowNode
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as TransformNodeConfig
 
@@ -299,7 +352,9 @@ function TransformConfigSection({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="page-label">Column mappings</p>
-          <p className="mt-1 text-sm text-secondary">Rename or drop fields as rows move downstream.</p>
+          <p className="mt-1 text-sm text-secondary">
+            Rename or drop fields as rows move downstream.
+          </p>
         </div>
         <Button
           onClick={() =>
@@ -357,14 +412,17 @@ function JoinConfigSection({
 }: {
   node: PipelineFlowNode
   incomingCount: number
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as JoinNodeConfig
 
   return (
     <section className="space-y-4">
       <NoticeBox tone="info">
-        Incoming edges detected: {incomingCount}. Join expects exactly two upstream inputs.
+        Incoming edges detected: {incomingCount}. Join expects exactly two
+        upstream inputs.
       </NoticeBox>
       <Field
         label="Join key"
@@ -402,13 +460,15 @@ function OutputConfigSection({
   updateNodeConfig,
 }: {
   node: PipelineFlowNode
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as OutputNodeConfig
 
   return (
     <section className="space-y-4">
-      <label className="flex items-center justify-between gap-3 border border-border bg-surface-raised px-4 py-3 text-sm">
+      <label className="bg-surface-raised flex items-center justify-between gap-3 border border-border px-4 py-3 text-sm">
         <div>
           <p className="field-label">Endpoint draft</p>
           <p className="mt-1 text-secondary">
@@ -453,15 +513,18 @@ function TelegramTriggerConfigSection({
 }: {
   node: PipelineFlowNode
   telegramIntegrations: TelegramIntegration[]
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as TelegramTriggerNodeConfig
 
   return (
     <section className="space-y-4">
       <NoticeBox tone="info">
-        Trigger nodes start a pipeline from Telegram webhooks. For manual runs, add a mock event
-        payload or the backend will inject a default `/start` event.
+        Trigger nodes start a pipeline from Telegram webhooks. For manual runs,
+        add a mock event payload or the backend will inject a default `/start`
+        event.
       </NoticeBox>
       <TelegramIntegrationSelect
         id={`telegram-trigger-${node.id}`}
@@ -509,8 +572,8 @@ function TelegramTriggerConfigSection({
         value={config.mockEventJson}
       />
       <NoticeBox tone="info">
-        Leave `telegram_chat_id` out of the mock payload if you want the send node to use the
-        integration&apos;s saved default chat ID.
+        Leave `telegram_chat_id` out of the mock payload if you want the send
+        node to use the integration&apos;s saved default chat ID.
       </NoticeBox>
     </section>
   )
@@ -521,15 +584,18 @@ function TelegramTemplateConfigSection({
   updateNodeConfig,
 }: {
   node: PipelineFlowNode
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as TelegramTemplateNodeConfig
 
   return (
     <section className="space-y-4">
       <NoticeBox tone="info">
-        Template placeholders read input row fields, for example `{'{{telegram_from_username}}'}`,
-        `{'{{order_code}}'}`, or `{'{{customer.name}}'}`.
+        Template placeholders read input row fields, for example `
+        {"{{telegram_from_username}}"}`, `{"{{order_code}}"}`, or `
+        {"{{customer.name}}"}`.
       </NoticeBox>
       <Field
         label="Output field"
@@ -564,15 +630,17 @@ function TelegramSendConfigSection({
 }: {
   node: PipelineFlowNode
   telegramIntegrations: TelegramIntegration[]
-  updateNodeConfig: ReturnType<typeof usePipelineCanvasStore.getState>["updateNodeConfig"]
+  updateNodeConfig: ReturnType<
+    typeof usePipelineCanvasStore.getState
+  >["updateNodeConfig"]
 }) {
   const config = node.data.config as TelegramSendNodeConfig
 
   return (
     <section className="space-y-4">
       <NoticeBox tone="info">
-        Send target priority is override chat ID, then `telegram_chat_id` from the input row, then
-        the integration&apos;s saved default chat ID.
+        Send target priority is override chat ID, then `telegram_chat_id` from
+        the input row, then the integration&apos;s saved default chat ID.
       </NoticeBox>
       <TelegramIntegrationSelect
         id={`telegram-send-${node.id}`}
@@ -614,7 +682,8 @@ function TelegramSendConfigSection({
         onChange={(event) =>
           updateNodeConfig<"telegram-send">(node.id, (current) => ({
             ...current,
-            parseMode: event.target.value as TelegramSendNodeConfig["parseMode"],
+            parseMode: event.target
+              .value as TelegramSendNodeConfig["parseMode"],
           }))
         }
         value={config.parseMode}
@@ -631,13 +700,17 @@ function OutputPreview({ rows }: { rows: PipelineRow[] }) {
   const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
 
   if (rows.length === 0) {
-    return <NoticeBox tone="info">Save first, then run the pipeline to preview output rows here.</NoticeBox>
+    return (
+      <NoticeBox tone="info">
+        Run the current draft to preview output rows here.
+      </NoticeBox>
+    )
   }
 
   return (
     <div className="space-y-3">
       <p className="page-label">Output preview</p>
-      <div className="overflow-x-auto border border-border bg-surface">
+      <div className="bg-surface overflow-x-auto border border-border">
         <table className="data-table min-w-full">
           <thead>
             <tr>
@@ -729,7 +802,12 @@ function SelectField({
   return (
     <label className="field-stack" htmlFor={id}>
       <span className="field-label">{label}</span>
-      <select className="field-select" id={id} onChange={onChange} value={value}>
+      <select
+        className="field-select"
+        id={id}
+        onChange={onChange}
+        value={value}
+      >
         {children}
       </select>
     </label>
@@ -753,7 +831,9 @@ function TelegramIntegrationSelect({
     <SelectField
       id={id}
       label={label}
-      onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}
+      onChange={(event) =>
+        onChange(event.target.value ? Number(event.target.value) : null)
+      }
       value={value ?? ""}
     >
       <option value="">Select a Telegram bot</option>
@@ -776,7 +856,7 @@ function TransformMappingRow({
   onRemove: () => void
 }) {
   return (
-    <div className="border border-border bg-surface-raised px-3 py-3">
+    <div className="bg-surface-raised border border-border px-3 py-3">
       <div className="grid gap-3">
         <Field
           label="Original name"
@@ -792,7 +872,9 @@ function TransformMappingRow({
           <input
             checked={mapping.drop}
             className="size-4 rounded border-border"
-            onChange={(event) => onChange({ ...mapping, drop: event.target.checked })}
+            onChange={(event) =>
+              onChange({ ...mapping, drop: event.target.checked })
+            }
             type="checkbox"
           />
           Drop this column
@@ -817,7 +899,7 @@ function NoticeBox({
       className={
         tone === "warning"
           ? "rounded-[8px] border border-[color:color-mix(in_oklab,var(--warning)_40%,transparent)] bg-[color:color-mix(in_oklab,var(--warning)_10%,transparent)] px-4 py-3 text-sm leading-7 text-foreground"
-          : "rounded-[8px] border border-border bg-surface-raised px-4 py-3 text-sm leading-7 text-secondary"
+          : "bg-surface-raised rounded-[8px] border border-border px-4 py-3 text-sm leading-7 text-secondary"
       }
     >
       {children}

@@ -178,6 +178,26 @@ func validateUpdateQueryInput(input usecase.UpdateQueryInput) ValidationErrors {
 	return errs
 }
 
+func validateCreateEndpointInput(input usecase.CreateEndpointInput) ValidationErrors {
+	var errs ValidationErrors
+
+	if strings.TrimSpace(input.TargetKind) == "" {
+		errs.Add("targetKind", "targetKind is required")
+	}
+	if input.TargetID == 0 {
+		errs.Add("targetId", "targetId is required")
+	}
+	if strings.TrimSpace(input.Name) == "" {
+		errs.Add("name", "name is required")
+	}
+
+	return errs
+}
+
+func validateUpdateEndpointInput(input usecase.UpdateEndpointInput) ValidationErrors {
+	return validateCreateEndpointInput(usecase.CreateEndpointInput(input))
+}
+
 func validateRunQueryInput(input usecase.RunQueryInput) ValidationErrors {
 	var errs ValidationErrors
 
@@ -207,6 +227,21 @@ func validateUpdatePipelineInput(input usecase.UpdatePipelineInput) ValidationEr
 		Name:       input.Name,
 		CanvasJSON: input.CanvasJSON,
 	})
+}
+
+func validateRunDraftPipelineInput(input usecase.RunDraftPipelineInput) ValidationErrors {
+	var errs ValidationErrors
+
+	if strings.TrimSpace(input.Name) == "" {
+		errs.Add("name", "name is required")
+	}
+	if strings.TrimSpace(input.CanvasJSON) == "" {
+		errs.Add("canvasJson", "canvasJson is required")
+	} else if !json.Valid([]byte(strings.TrimSpace(input.CanvasJSON))) {
+		errs.Add("canvasJson", "canvasJson must be valid JSON")
+	}
+
+	return errs
 }
 
 func validateCreateTelegramIntegrationInput(input usecase.CreateTelegramIntegrationInput) ValidationErrors {
@@ -245,6 +280,25 @@ func validateUpdateSystemSettingsInput(input usecase.UpdateSystemSettingsInput) 
 		errs.Add("defaultPageSize", "defaultPageSize must be between 5 and 200")
 	}
 
+	return errs
+}
+
+func validateCreateAPIKeyInput(input usecase.CreateAPIKeyInput) ValidationErrors {
+	var errs ValidationErrors
+	if strings.TrimSpace(input.Name) == "" {
+		errs.Add("name", "name is required")
+	}
+	return errs
+}
+
+func validateUpdateAPIKeyInput(input usecase.UpdateAPIKeyInput) ValidationErrors {
+	var errs ValidationErrors
+	if input.Name == nil && input.Description == nil && input.Scopes == nil && input.IsActive == nil {
+		errs.Add("body", "at least one field must be provided")
+	}
+	if input.Name != nil && strings.TrimSpace(*input.Name) == "" {
+		errs.Add("name", "name is required")
+	}
 	return errs
 }
 

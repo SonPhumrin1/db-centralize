@@ -35,8 +35,13 @@ var (
 )
 
 type SourceResolver func(ctx context.Context, id, userID uint) (*model.DataSource, error)
-type DBRunner func(ctx context.Context, source model.DataSource, queryBody string) ([]map[string]any, error)
-type RESTRunner func(ctx context.Context, source model.DataSource, request restrequest.Request) ([]map[string]any, error)
+type QueryExecutionOptions struct {
+	Params   map[string]any
+	RowLimit int
+}
+
+type DBRunner func(ctx context.Context, source model.DataSource, queryBody string, options QueryExecutionOptions) ([]map[string]any, error)
+type RESTRunner func(ctx context.Context, source model.DataSource, request restrequest.Request, options QueryExecutionOptions) ([]map[string]any, error)
 type TelegramIntegrationResolver func(ctx context.Context, id, userID uint) (*model.TelegramIntegration, error)
 type TelegramSender func(ctx context.Context, integration model.TelegramIntegration, message TelegramMessage) (map[string]any, error)
 
@@ -51,6 +56,7 @@ type PipelineExecutor struct {
 type ExecuteOptions struct {
 	Manual         bool
 	TelegramEvents map[uint][]map[string]any
+	Params         map[string]any
 }
 
 type TelegramMessage struct {
@@ -238,7 +244,9 @@ func (e *PipelineExecutor) executeNode(
 			if queryBody == "" {
 				return nil, ErrMissingSourceExecution
 			}
-			return e.RunDB(ctx, *source, queryBody)
+			return e.RunDB(ctx, *source, queryBody, QueryExecutionOptions{
+				Params: options.Params,
+			})
 		case model.DataSourceTypeREST:
 			if e.RunREST == nil {
 				return nil, ErrInvalidCanvas
@@ -247,7 +255,9 @@ func (e *PipelineExecutor) executeNode(
 			if err != nil {
 				return nil, err
 			}
-			return e.RunREST(ctx, *source, request)
+			return e.RunREST(ctx, *source, request, QueryExecutionOptions{
+				Params: options.Params,
+			})
 		default:
 			return nil, fmt.Errorf("unsupported source type %q", source.Type)
 		}

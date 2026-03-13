@@ -1,6 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { ChevronDown } from "lucide-react"
 import { useState } from "react"
 
 import {
@@ -27,6 +28,40 @@ const initialFormState: CreateFormState = {
   username: "",
   password: "",
   role: "member",
+}
+
+function RoleSelect({
+  value,
+  disabled,
+  onChange,
+  compact = false,
+}: {
+  value: AdminUser["role"]
+  disabled?: boolean
+  onChange: (next: AdminUser["role"]) => void
+  compact?: boolean
+}) {
+  return (
+    <div className={compact ? "relative w-full min-w-[172px]" : "relative w-full"}>
+      <select
+        className={
+          compact
+            ? "h-9 w-full appearance-none rounded-[10px] border border-[color:color-mix(in_oklab,var(--border)_82%,var(--accent)_18%)] bg-[color:color-mix(in_oklab,var(--surface)_80%,var(--surface-tint)_20%)] pl-3.5 pr-9 text-sm font-medium text-foreground shadow-[inset_0_1px_0_color-mix(in_oklab,white_68%,transparent)] outline-none transition-colors hover:border-[color:color-mix(in_oklab,var(--accent)_32%,var(--border))] focus-visible:border-[color:var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+            : "h-[var(--field-height)] w-full appearance-none rounded-[10px] border border-[color:color-mix(in_oklab,var(--border)_82%,var(--accent)_18%)] bg-[color:color-mix(in_oklab,var(--surface)_82%,var(--surface-tint)_18%)] pl-3.5 pr-9 text-sm font-medium text-foreground shadow-[inset_0_1px_0_color-mix(in_oklab,white_68%,transparent)] outline-none transition-colors hover:border-[color:color-mix(in_oklab,var(--accent)_32%,var(--border))] focus-visible:border-[color:var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+        }
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as AdminUser["role"])}
+        value={value}
+      >
+        {adminRoleOptions.map((role) => (
+          <option key={role.value} value={role.value}>
+            {role.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+    </div>
+  )
 }
 
 export function UserManagementWorkspace({ currentUserId }: { currentUserId: number }) {
@@ -125,15 +160,10 @@ export function UserManagementWorkspace({ currentUserId }: { currentUserId: numb
             <Input onChange={(event) => updateForm("email", event.target.value)} placeholder="Email" type="email" value={form.email} />
             <Input onChange={(event) => updateForm("username", event.target.value)} placeholder="Username" value={form.username} />
             <Input onChange={(event) => updateForm("password", event.target.value)} placeholder="Temporary password" type="password" value={form.password} />
-            <select
-              className="field-select"
-              onChange={(event) => updateForm("role", event.target.value as CreateFormState["role"])}
+            <RoleSelect
+              onChange={(next) => updateForm("role", next)}
               value={form.role}
-            >
-              {adminRoleOptions.map((role) => (
-                <option key={role.value} value={role.value}>{role.label}</option>
-              ))}
-            </select>
+            />
           </div>
           <div className="mt-3 flex justify-end">
             <Button
@@ -188,37 +218,33 @@ export function UserManagementWorkspace({ currentUserId }: { currentUserId: numb
 
               return (
                 <tr key={user.id} className="data-row">
-                  <td>
+                  <td className="h-auto py-3">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{user.name}</span>
                       {isCurrentUser ? <span className="type-tag">You</span> : null}
                     </div>
                     <div className="mono-value text-secondary">{user.username}</div>
                   </td>
-                  <td className="text-sm">{user.email}</td>
-                  <td className="w-[220px]">
-                    <div className="w-full max-w-[220px]">
-                      <select
-                        className="field-select"
+                  <td className="h-auto py-3 text-sm">{user.email}</td>
+                  <td className="h-auto w-[220px] py-3">
+                    <div className="w-full max-w-[196px]">
+                      <RoleSelect
+                        compact
                         disabled={isPending}
-                        onChange={(event) =>
+                        onChange={(next) =>
                           updateMutation.mutate({
                             id: user.id,
-                            payload: { role: event.target.value as AdminUser["role"] },
+                            payload: { role: next },
                           })
                         }
                         value={user.role}
-                      >
-                        {adminRoleOptions.map((role) => (
-                          <option key={role.value} value={role.value}>{role.label}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </td>
-                  <td>
+                  <td className="h-auto py-3">
                     <StatusBadge label={user.isActive ? "Active" : "Inactive"} tone={user.isActive ? "success" : "muted"} />
                   </td>
-                  <td className="w-[132px]">
+                  <td className="h-auto w-[132px] py-3">
                     <div className="flex items-center justify-end pr-1">
                       <SwitchButton
                         checked={user.isActive}
@@ -274,4 +300,3 @@ export function UserManagementWorkspace({ currentUserId }: { currentUserId: numb
     </section>
   )
 }
-

@@ -263,7 +263,7 @@ func testExecutor(t *testing.T) *PipelineExecutor {
 				return nil, nil
 			}
 		},
-		RunDB: func(_ context.Context, source model.DataSource, queryBody string) ([]map[string]any, error) {
+		RunDB: func(_ context.Context, source model.DataSource, queryBody string, _ QueryExecutionOptions) ([]map[string]any, error) {
 			switch source.ID {
 			case 1:
 				return []map[string]any{
@@ -279,7 +279,7 @@ func testExecutor(t *testing.T) *PipelineExecutor {
 				return nil, nil
 			}
 		},
-		RunREST: func(_ context.Context, source model.DataSource, request restrequest.Request) ([]map[string]any, error) {
+		RunREST: func(_ context.Context, source model.DataSource, request restrequest.Request, _ QueryExecutionOptions) ([]map[string]any, error) {
 			if source.ID != 3 {
 				t.Fatalf("unexpected rest source %#v", source)
 			}

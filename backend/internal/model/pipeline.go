@@ -5,6 +5,9 @@ import "time"
 const (
 	PipelineRunStatusSuccess = "success"
 	PipelineRunStatusError   = "error"
+	PipelineRunModeSaved     = "saved"
+	PipelineRunModeDraft     = "draft"
+	PipelineRunModeTelegram  = "telegram"
 )
 
 // Pipeline stores the serialized canvas owned by a single user.
@@ -25,11 +28,14 @@ func (Pipeline) TableName() string {
 // PipelineRun stores historical execution snapshots.
 type PipelineRun struct {
 	ID             uint      `gorm:"primaryKey"`
-	PipelineID     uint      `gorm:"column:pipeline_id;not null;index"`
+	PipelineID     *uint     `gorm:"column:pipeline_id;index"`
+	PipelineName   string    `gorm:"column:pipeline_name;size:255;not null"`
+	RunMode        string    `gorm:"column:run_mode;size:32;not null;default:saved"`
 	Status         string    `gorm:"size:32;not null"`
+	CanvasSnapshot string    `gorm:"column:canvas_snapshot;type:text;not null"`
 	ResultSnapshot string    `gorm:"column:result_snapshot;type:text;not null"`
 	RanAt          time.Time `gorm:"column:ran_at;not null;index"`
-	Pipeline       Pipeline  `gorm:"foreignKey:PipelineID;constraint:OnDelete:CASCADE"`
+	Pipeline       *Pipeline `gorm:"foreignKey:PipelineID;constraint:OnDelete:CASCADE"`
 }
 
 func (PipelineRun) TableName() string {

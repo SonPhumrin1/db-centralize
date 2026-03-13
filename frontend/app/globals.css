@@ -13,11 +13,13 @@
     "IBM Plex Mono", "DM Mono", "SFMono-Regular", "SF Mono", Consolas, monospace;
   --background: oklch(0.9818 0.0054 95.0986);
   --foreground: oklch(0.3438 0.0269 95.7226);
-  --secondary: oklch(0.6059 0.0075 97.4233);
+  --secondary: oklch(0.502 0.0104 96.8);
   --tertiary: oklch(0.7621 0.0156 98.3528);
   --surface: oklch(1 0 0);
-  --surface-raised: color-mix(in oklab, white 84%, var(--accent) 16%);
-  --surface-subtle: color-mix(in oklab, white 76%, var(--accent) 24%);
+  --surface-raised: color-mix(in oklab, white 94%, var(--accent) 6%);
+  --surface-subtle: color-mix(in oklab, white 97%, var(--accent) 3%);
+  --surface-tint: color-mix(in oklab, white 89%, var(--accent) 11%);
+  --surface-tint-strong: color-mix(in oklab, white 82%, var(--accent) 18%);
   --accent: oklch(0.6829 0.1055 223.6013);
   --accent-strong: oklch(0.627 0.118 225.8);
   --accent-foreground: oklch(1 0 0);
@@ -27,10 +29,18 @@
   --warning: oklch(0.72 0.09 78);
   --danger: oklch(0.62 0.13 24);
   --sidebar: transparent;
-  --sidebar-panel: color-mix(in oklab, var(--surface) 94%, var(--surface-raised));
-  --sidebar-surface: color-mix(in oklab, var(--surface) 88%, var(--surface-raised));
+  --sidebar-panel: color-mix(
+    in oklab,
+    var(--surface) 94%,
+    var(--surface-raised)
+  );
+  --sidebar-surface: color-mix(
+    in oklab,
+    var(--surface) 88%,
+    var(--surface-raised)
+  );
   --sidebar-foreground: oklch(0.359 0.0051 106.6524);
-  --sidebar-muted: oklch(0.6059 0.0075 97.4233);
+  --sidebar-muted: oklch(0.502 0.0104 96.8);
   --sidebar-subtle: oklch(0.689 0.0104 98.6);
   --sidebar-border: color-mix(in oklab, var(--border) 90%, white 10%);
   --sidebar-highlight: color-mix(in oklab, white 64%, var(--accent) 36%);
@@ -65,11 +75,29 @@
 :root[data-theme-mode="dark"] {
   --background: oklch(0.2679 0.0036 106.6427);
   --foreground: oklch(0.8074 0.0142 93.0137);
-  --secondary: oklch(0.7713 0.0169 99.0657);
+  --secondary: oklch(0.823 0.017 99.1);
   --tertiary: oklch(0.4336 0.0113 100.2195);
   --surface: oklch(0.2679 0.0036 106.6427);
-  --surface-raised: color-mix(in oklab, oklch(0.3085 0.0035 106.6039) 80%, var(--accent) 20%);
-  --surface-subtle: color-mix(in oklab, oklch(0.2213 0.0038 106.707) 70%, var(--accent) 30%);
+  --surface-raised: color-mix(
+    in oklab,
+    oklch(0.3085 0.0035 106.6039) 92%,
+    var(--accent) 8%
+  );
+  --surface-subtle: color-mix(
+    in oklab,
+    oklch(0.2213 0.0038 106.707) 96%,
+    var(--accent) 4%
+  );
+  --surface-tint: color-mix(
+    in oklab,
+    oklch(0.3085 0.0035 106.6039) 82%,
+    var(--accent) 18%
+  );
+  --surface-tint-strong: color-mix(
+    in oklab,
+    oklch(0.2213 0.0038 106.707) 72%,
+    var(--accent) 28%
+  );
   --accent: oklch(0.646 0.111 223.2);
   --accent-strong: oklch(0.708 0.135 228.1);
   --accent-foreground: oklch(1 0 0);
@@ -82,13 +110,21 @@
   --sidebar-panel: color-mix(in oklab, var(--surface-raised) 84%, black 16%);
   --sidebar-surface: color-mix(in oklab, var(--surface-raised) 92%, white 8%);
   --sidebar-foreground: oklch(0.8074 0.0142 93.0137);
-  --sidebar-muted: oklch(0.7713 0.0169 99.0657);
+  --sidebar-muted: oklch(0.823 0.017 99.1);
   --sidebar-subtle: oklch(0.615 0.0106 100.3);
   --sidebar-border: oklch(0.3618 0.0101 106.8928 / 0.84);
   --sidebar-highlight: color-mix(in oklab, white 6%, transparent);
   --sidebar-hover: color-mix(in oklab, var(--accent) 10%, var(--sidebar-panel));
-  --sidebar-active: color-mix(in oklab, var(--accent) 22%, var(--sidebar-panel));
-  --sidebar-active-foreground: color-mix(in oklab, white 90%, var(--accent) 10%);
+  --sidebar-active: color-mix(
+    in oklab,
+    var(--accent) 22%,
+    var(--sidebar-panel)
+  );
+  --sidebar-active-foreground: color-mix(
+    in oklab,
+    white 90%,
+    var(--accent) 10%
+  );
   --sidebar-active-border: color-mix(in oklab, var(--accent) 34%, transparent);
   --sidebar-shadow: 0 6px 16px rgba(2, 6, 14, 0.12);
   --canvas-surface: oklch(0.188 0.005 96);
@@ -394,16 +430,16 @@
 
   .page-label {
     color: var(--secondary);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
   }
 
   .page-copy {
     color: var(--secondary);
-    font-size: 0.92rem;
-    line-height: 1.7;
+    font-size: 0.96rem;
+    line-height: 1.65;
     max-width: 60rem;
   }
 
@@ -415,6 +451,11 @@
 
   .panel-header {
     @apply flex items-center justify-between gap-3 border-b border-border;
+    background: color-mix(
+      in oklab,
+      var(--surface) 34%,
+      var(--surface-tint) 66%
+    );
     padding: var(--toolbar-padding-y) var(--toolbar-padding-x);
   }
 
@@ -424,6 +465,11 @@
 
   .toolbar {
     @apply flex flex-wrap items-center justify-between gap-3 border-b border-border;
+    background: color-mix(
+      in oklab,
+      var(--surface) 38%,
+      var(--surface-tint) 62%
+    );
     padding: var(--toolbar-padding-y) var(--toolbar-padding-x);
   }
 
@@ -443,7 +489,7 @@
 
   .data-table thead th {
     @apply sticky top-0 z-10 border-b border-border px-3 py-2 text-left align-bottom;
-    background-color: var(--surface-raised);
+    background-color: var(--surface-tint);
     color: var(--secondary);
     font-size: 11px;
     font-weight: 600;
@@ -472,7 +518,7 @@
   .type-tag {
     @apply inline-flex items-center rounded-[4px] border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase;
     color: var(--secondary);
-    background: color-mix(in oklab, var(--surface-raised) 88%, transparent);
+    background: color-mix(in oklab, var(--surface-tint) 90%, transparent);
   }
 
   .status-dot {
