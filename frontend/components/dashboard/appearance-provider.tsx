@@ -7,8 +7,9 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useState,
   useMemo,
+  useRef,
+  useState,
   type ReactNode,
 } from "react"
 
@@ -206,6 +207,7 @@ async function readAppearanceResponse(response: Response) {
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { setTheme } = useTheme()
+  const hasLocalPreviewRef = useRef(false)
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [canManageDefaults, setCanManageDefaults] = useState(false)
@@ -270,10 +272,13 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 
         setCanManageDefaults(payload.canManageDefaults)
         setSavedDefaultsAppearance(payload.defaults)
-        setDefaultsAppearance(payload.defaults)
         setSavedOverride(payload.override)
-        setDraftOverride(payload.override)
-        applyAndSyncTheme(payload.resolved)
+
+        if (!hasLocalPreviewRef.current) {
+          setDefaultsAppearance(payload.defaults)
+          setDraftOverride(payload.override)
+          applyAndSyncTheme(payload.resolved)
+        }
       } catch {
         if (!cancelled) {
           applyAndSyncTheme(initial)
@@ -302,6 +307,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 
   const previewAppearance = useCallback(
     (patch: Partial<AppearanceSettings>) => {
+      hasLocalPreviewRef.current = true
       const nextDraft = createOverrideFromPatch(
         draftOverride,
         defaultsAppearance,
@@ -315,9 +321,16 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 
   const previewDefaultsAppearance = useCallback(
     (patch: Partial<AppearanceSettings>) => {
+      hasLocalPreviewRef.current = true
       const nextDefaults = mergePatch(defaultsAppearance, patch)
+      const nextDraftOverride = createOverrideFromPatch(
+        draftOverride,
+        nextDefaults,
+        patch
+      )
       setDefaultsAppearance(nextDefaults)
-      applyAndSyncTheme(resolveAppearance(nextDefaults, draftOverride))
+      setDraftOverride(nextDraftOverride)
+      applyAndSyncTheme(resolveAppearance(nextDefaults, nextDraftOverride))
     },
     [applyAndSyncTheme, defaultsAppearance, draftOverride]
   )
@@ -338,8 +351,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     })
     const next = await readAppearanceResponse(response)
 
+    hasLocalPreviewRef.current = false
     setCanManageDefaults(next.canManageDefaults)
     setSavedDefaultsAppearance(next.defaults)
+    setDefaultsAppearance(next.defaults)
     setSavedOverride(next.override)
     setDraftOverride(next.override)
     applyAndSyncTheme(next.resolved)
@@ -351,6 +366,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     })
     const next = await readAppearanceResponse(response)
 
+    hasLocalPreviewRef.current = false
     setCanManageDefaults(next.canManageDefaults)
     setSavedDefaultsAppearance(next.defaults)
     setDefaultsAppearance(next.defaults)
@@ -378,12 +394,15 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       throw new Error(await readErrorMessage(response))
     }
 
+    // Saving the team preset should also clear any local override for
+    // the current operator so the workspace immediately reflects the
+    // shared team theme again.
     const reloaded = await fetch("/api/platform/settings/ui", {
-      cache: "no-store",
-      credentials: "same-origin",
+      method: "DELETE",
     })
     const next = await readAppearanceResponse(reloaded)
 
+    hasLocalPreviewRef.current = false
     setCanManageDefaults(next.canManageDefaults)
     setSavedDefaultsAppearance(next.defaults)
     setDefaultsAppearance(next.defaults)
@@ -394,6 +413,34 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 
   const toggleMode = useCallback(async () => {
     const nextMode = appearance.mode === "dark" ? "light" : "dark"
+    hasLocalPreviewRef.current = true
+
+    if (canManageDefaults) {
+      const response = await fetch("/api/platform/admin/settings/ui-defaults", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mode: nextMode }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response))
+      }
+
+      const nextResponse = await fetch("/api/platform/settings/ui", {
+        method: "DELETE",
+      })
+      const next = await readAppearanceResponse(nextResponse)
+
+      hasLocalPreviewRef.current = false
+      setCanManageDefaults(next.canManageDefaults)
+      setSavedDefaultsAppearance(next.defaults)
+      setDefaultsAppearance(next.defaults)
+      setSavedOverride(next.override)
+      setDraftOverride(next.override)
+      applyAndSyncTheme(next.resolved)
+      return
+    }
+
     const response = await fetch("/api/platform/settings/ui", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -401,6 +448,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     })
     const next = await readAppearanceResponse(response)
 
+    hasLocalPreviewRef.current = false
     setSavedDefaultsAppearance(next.defaults)
     setCanManageDefaults(next.canManageDefaults)
     setSavedOverride(next.override)
@@ -408,7 +456,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       createOverrideFromPatch(current, defaultsAppearance, { mode: nextMode })
     )
     applyAndSyncTheme(next.resolved)
-  }, [appearance.mode, applyAndSyncTheme, defaultsAppearance])
+  }, [appearance.mode, applyAndSyncTheme, canManageDefaults, defaultsAppearance])
 
   const value = useMemo<AppearanceContextValue>(
     () => ({

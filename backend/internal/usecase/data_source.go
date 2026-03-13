@@ -490,30 +490,9 @@ func openDatabaseConnection(sourceType string, config DataSourceConfig) (*gorm.D
 
 	switch sourceType {
 	case model.DataSourceTypePostgres:
-		sslMode := "disable"
-		if config.SSL {
-			sslMode = "require"
-		}
-		dsn := fmt.Sprintf(
-			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=5",
-			config.Host,
-			config.Port,
-			config.Username,
-			config.Password,
-			config.Database,
-			sslMode,
-		)
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		db, err = gorm.Open(postgres.Open(buildPostgresDSN(config)), &gorm.Config{})
 	case model.DataSourceTypeMySQL:
-		dsn := fmt.Sprintf(
-			"%s:%s@tcp(%s:%d)/%s?parseTime=true&timeout=5s",
-			config.Username,
-			config.Password,
-			config.Host,
-			config.Port,
-			config.Database,
-		)
-		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		db, err = gorm.Open(mysql.Open(buildMySQLDSN(config)), &gorm.Config{})
 	default:
 		return nil, nil, ErrUnsupportedDataSourceType
 	}
@@ -527,6 +506,40 @@ func openDatabaseConnection(sourceType string, config DataSourceConfig) (*gorm.D
 	}
 
 	return db, sqlDB.Close, nil
+}
+
+func buildPostgresDSN(config DataSourceConfig) string {
+	sslMode := "disable"
+	if config.SSL {
+		sslMode = "require"
+	}
+
+	return fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=5",
+		config.Host,
+		config.Port,
+		config.Username,
+		config.Password,
+		config.Database,
+		sslMode,
+	)
+}
+
+func buildMySQLDSN(config DataSourceConfig) string {
+	tlsMode := "false"
+	if config.SSL {
+		tlsMode = "true"
+	}
+
+	return fmt.Sprintf(
+		"%s:%s@tcp(%s:%d)/%s?parseTime=true&timeout=5s&tls=%s",
+		config.Username,
+		config.Password,
+		config.Host,
+		config.Port,
+		config.Database,
+		tlsMode,
+	)
 }
 
 func buildRESTHeaders(config DataSourceConfig) map[string]string {

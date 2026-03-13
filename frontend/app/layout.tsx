@@ -1,5 +1,7 @@
 import "./globals.css"
 
+import type { Metadata } from "next"
+
 import { AppearanceProvider } from "@/components/dashboard/appearance-provider"
 import { AppQueryClientProvider } from "@/components/query-client-provider"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -8,6 +10,15 @@ import {
   defaultAppearanceSettings,
   getAppearanceInitScript,
 } from "@/lib/appearance-preferences"
+
+const faviconVersion = "20260313"
+
+export const metadata: Metadata = {
+  icons: {
+    icon: `/favicon.ico?v=${faviconVersion}`,
+    shortcut: `/favicon.ico?v=${faviconVersion}`,
+  },
+}
 
 export default function RootLayout({
   children,

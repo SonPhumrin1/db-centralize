@@ -16,8 +16,8 @@
   --secondary: oklch(0.6059 0.0075 97.4233);
   --tertiary: oklch(0.7621 0.0156 98.3528);
   --surface: oklch(1 0 0);
-  --surface-raised: oklch(0.9245 0.0138 92.9892);
-  --surface-subtle: oklch(0.9341 0.0153 90.239);
+  --surface-raised: color-mix(in oklab, white 84%, var(--accent) 16%);
+  --surface-subtle: color-mix(in oklab, white 76%, var(--accent) 24%);
   --accent: oklch(0.6829 0.1055 223.6013);
   --accent-strong: oklch(0.627 0.118 225.8);
   --accent-foreground: oklch(1 0 0);
@@ -68,8 +68,8 @@
   --secondary: oklch(0.7713 0.0169 99.0657);
   --tertiary: oklch(0.4336 0.0113 100.2195);
   --surface: oklch(0.2679 0.0036 106.6427);
-  --surface-raised: oklch(0.3085 0.0035 106.6039);
-  --surface-subtle: oklch(0.2213 0.0038 106.707);
+  --surface-raised: color-mix(in oklab, oklch(0.3085 0.0035 106.6039) 80%, var(--accent) 20%);
+  --surface-subtle: color-mix(in oklab, oklch(0.2213 0.0038 106.707) 70%, var(--accent) 30%);
   --accent: oklch(0.646 0.111 223.2);
   --accent-strong: oklch(0.708 0.135 228.1);
   --accent-foreground: oklch(1 0 0);

@@ -11,7 +11,7 @@ function hasSessionCookie(request: NextRequest) {
   return sessionCookieNames.some((cookieName) => request.cookies.has(cookieName))
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { nextUrl } = request
   const isProtectedRoute = protectedPrefixes.some((prefix) =>
     nextUrl.pathname.startsWith(prefix)

@@ -18,7 +18,7 @@ import {
 
 const sidebarInset = 12
 const collapsedSidebarPanelWidth = 64
-const expandedSidebarPanelWidth = 188
+const expandedSidebarPanelWidth = 220
 
 export function DashboardShell({
   children,
@@ -85,7 +85,7 @@ export function DashboardShell({
   const sidebarPanelWidth = expanded
     ? expandedSidebarPanelWidth
     : collapsedSidebarPanelWidth
-  const sidebarWidth = sidebarPanelWidth + sidebarInset
+  const sidebarRailWidth = collapsedSidebarPanelWidth + sidebarInset
 
   return (
     <div className="app-shell md:flex md:gap-4 lg:gap-5">
@@ -105,7 +105,7 @@ export function DashboardShell({
         role={role}
         sidebarInset={sidebarInset}
         sidebarPanelWidth={sidebarPanelWidth}
-        sidebarWidth={sidebarWidth}
+        sidebarRailWidth={sidebarRailWidth}
         username={username}
       />
 
@@ -119,7 +119,7 @@ export function DashboardShell({
               <p className="text-sm font-medium">{username}</p>
             </div>
             <div className="flex items-center gap-1">
-              <ThemeToggle />
+              {isAdmin ? <ThemeToggle /> : null}
               <form action={signOut}>
                 <Button size="icon-sm" type="submit" variant="ghost">
                   <LogOut className="size-4" />

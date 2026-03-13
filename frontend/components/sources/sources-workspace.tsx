@@ -77,7 +77,7 @@ function buildDefaultConfig(type: DataSourceType): DraftConfig {
     case "postgres":
       return { port: 5432, ssl: false }
     case "mysql":
-      return { port: 3306 }
+      return { port: 3306, ssl: false }
     case "rest":
       return { authType: "none", headers: {}, headersText: "" }
   }
@@ -631,14 +631,14 @@ function DatabaseFields({ config, onChange, type }: DatabaseFieldsProps) {
           value={config.password ?? ""}
         />
       </Field>
-      {type === "postgres" ? (
+      {type === "postgres" || type === "mysql" ? (
         <label className="flex h-9 items-center gap-2 rounded-[6px] border border-border px-3 text-sm text-secondary">
           <input
             checked={Boolean(config.ssl)}
             onChange={(event) => onChange("ssl", event.target.checked)}
             type="checkbox"
           />
-          Enable SSL
+          Enable TLS
         </label>
       ) : null}
     </div>
@@ -768,5 +768,4 @@ function serializeHeaders(headers?: Record<string, string>) {
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n")
 }
-
 

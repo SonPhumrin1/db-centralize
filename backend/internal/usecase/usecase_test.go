@@ -22,6 +22,53 @@ import (
 
 var testEncryptionKey = []byte("0123456789abcdef0123456789abcdef")
 
+func TestBuildPostgresDSNUsesSSLFlag(t *testing.T) {
+	t.Parallel()
+
+	config := DataSourceConfig{
+		Host:     "pg.internal",
+		Port:     5432,
+		Username: "reporter",
+		Password: "secret",
+		Database: "analytics",
+		SSL:      true,
+	}
+
+	dsn := buildPostgresDSN(config)
+	if !strings.Contains(dsn, "sslmode=require") {
+		t.Fatalf("expected postgres DSN to require SSL, got %q", dsn)
+	}
+
+	config.SSL = false
+	dsn = buildPostgresDSN(config)
+	if !strings.Contains(dsn, "sslmode=disable") {
+		t.Fatalf("expected postgres DSN to disable SSL, got %q", dsn)
+	}
+}
+
+func TestBuildMySQLDSNPreservesLegacyConfigsAndSupportsTLS(t *testing.T) {
+	t.Parallel()
+
+	legacyConfig := DataSourceConfig{
+		Host:     "mysql.internal",
+		Port:     3306,
+		Username: "reporter",
+		Password: "secret",
+		Database: "analytics",
+	}
+
+	legacyDSN := buildMySQLDSN(legacyConfig)
+	if !strings.Contains(legacyDSN, "tls=false") {
+		t.Fatalf("expected legacy mysql DSN to keep TLS disabled, got %q", legacyDSN)
+	}
+
+	legacyConfig.SSL = true
+	tlsDSN := buildMySQLDSN(legacyConfig)
+	if !strings.Contains(tlsDSN, "tls=true") {
+		t.Fatalf("expected mysql DSN to enable TLS when requested, got %q", tlsDSN)
+	}
+}
+
 func TestDataSourceUsecaseRestLifecycle(t *testing.T) {
 	t.Parallel()
 

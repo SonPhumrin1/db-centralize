@@ -30,7 +30,7 @@ export function DashboardSidebar({
   isAdmin,
   sidebarInset,
   sidebarPanelWidth,
-  sidebarWidth,
+  sidebarRailWidth,
 }: {
   expanded: boolean
   inputMethodRef: MutableRefObject<"keyboard" | "pointer">
@@ -45,18 +45,18 @@ export function DashboardSidebar({
   isAdmin: boolean
   sidebarInset: number
   sidebarPanelWidth: number
-  sidebarWidth: number
+  sidebarRailWidth: number
 }) {
   const displayName = username.trim() || "operator"
 
   return (
     <aside
-      className="relative hidden md:block md:h-svh md:shrink-0 md:self-start md:transition-[width] md:duration-360 md:ease-[cubic-bezier(0.2,0.9,0.24,1)]"
-      style={{ width: `${sidebarWidth}px` }}
+      className="relative hidden md:block md:h-svh md:shrink-0 md:self-start"
+      style={{ width: `${sidebarRailWidth}px` }}
     >
       <div
         className={cn(
-          "fixed top-3 z-30 flex h-[calc(100svh-24px)] overflow-hidden rounded-[calc(var(--radius-lg)+10px)] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl transition-[width,background-color,border-color,box-shadow] duration-420 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          "fixed top-3 z-30 flex h-[calc(100svh-24px)] overflow-hidden rounded-[calc(var(--radius-lg)+10px)] border bg-[color:var(--sidebar-panel)] text-[color:var(--sidebar-foreground)] shadow-[var(--sidebar-shadow)] ring-1 ring-[color:var(--sidebar-highlight)] backdrop-blur-xl transition-[width,background-color,border-color,box-shadow] duration-260 ease-[cubic-bezier(0.22,1,0.36,1)]"
         )}
         style={{ left: `${sidebarInset}px`, width: `${sidebarPanelWidth}px` }}
         onBlurCapture={(event) => {
@@ -84,7 +84,7 @@ export function DashboardSidebar({
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             className={cn(
-              "flex items-center border-b border-[color:var(--sidebar-border)] transition-[padding] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
+              "flex items-center border-b border-[color:var(--sidebar-border)] transition-[padding] duration-240 ease-[cubic-bezier(0.22,1,0.36,1)]",
               expanded ? "justify-between px-4 py-4" : "justify-center px-3 py-4"
             )}
           >
@@ -98,17 +98,17 @@ export function DashboardSidebar({
               <div
                 aria-hidden={!expanded}
                 className={cn(
-                  "min-w-0 overflow-hidden transition-[max-width,opacity,transform] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  "min-w-0 overflow-hidden transition-[max-width,opacity,transform] duration-220 ease-[cubic-bezier(0.22,1,0.36,1)]",
                   expanded
-                    ? "max-w-[110px] opacity-100 translate-x-0"
+                    ? "max-w-[152px] opacity-100 translate-x-0"
                     : "max-w-0 opacity-0 -translate-x-1"
                 )}
               >
                 <p className="truncate font-mono text-[10px] tracking-[0.14em] text-[color:var(--sidebar-subtle)] uppercase">
                   {platformName}
                 </p>
-                <p className="mt-1 text-[13px] font-medium leading-[1.15] text-[color:var(--sidebar-foreground)]">
-                  Project Overview
+                <p className="mt-1 truncate whitespace-nowrap text-[13px] font-medium leading-[1.15] text-[color:var(--sidebar-foreground)]">
+                  Operations Console
                 </p>
               </div>
             </div>
@@ -135,7 +135,7 @@ export function DashboardSidebar({
 
           <div
             className={cn(
-              "flex-1 transition-[padding] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
+              "flex-1 transition-[padding] duration-240 ease-[cubic-bezier(0.22,1,0.36,1)]",
               expanded ? "px-3 py-4" : "px-2 py-4"
             )}
           >
@@ -144,7 +144,7 @@ export function DashboardSidebar({
 
           <div
             className={cn(
-              "border-t border-[color:var(--sidebar-border)] transition-[padding] duration-360 ease-[cubic-bezier(0.16,1,0.3,1)]",
+              "border-t border-[color:var(--sidebar-border)] transition-[padding] duration-240 ease-[cubic-bezier(0.22,1,0.36,1)]",
               expanded ? "px-3 py-3" : "px-2 py-3"
             )}
           >
@@ -160,7 +160,9 @@ export function DashboardSidebar({
                       <span>{role}</span>
                     </div>
                   </div>
-                  <ThemeToggle className="text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]" />
+                  {isAdmin ? (
+                    <ThemeToggle className="text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]" />
+                  ) : null}
                 </div>
                 <form action={signOut} className="mt-3">
                   <Button
@@ -188,14 +190,16 @@ export function DashboardSidebar({
                 </div>
                 <Separator className="bg-[color:var(--sidebar-border)]" />
                 <div className="flex flex-col items-center gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <ThemeToggle className="text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={10}>Toggle theme</TooltipContent>
-                  </Tooltip>
+                  {isAdmin ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <ThemeToggle className="text-[color:var(--sidebar-muted)] hover:bg-[color:var(--sidebar-hover)] hover:text-[color:var(--sidebar-foreground)]" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={10}>Toggle theme</TooltipContent>
+                    </Tooltip>
+                  ) : null}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <form action={signOut}>

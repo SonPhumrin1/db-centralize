@@ -35,72 +35,32 @@ export function UICustomizePanel({ platformName }: { platformName: string }) {
     canManageDefaults,
     defaultsAppearance,
     defaultsDirty,
-    isDirty,
     loading,
     mounted,
-    previewAppearance,
     previewDefaultsAppearance,
-    resetAppearance,
-    saveAppearance,
     saveDefaultsAppearance,
-    savedAppearance,
     savedDefaultsAppearance,
   } = useAppearance()
-  const [personalNotice, setPersonalNotice] = useState<NoticeState>({
+  const [teamNotice, setTeamNotice] = useState<NoticeState>({
     kind: "idle",
   })
-  const [defaultsNotice, setDefaultsNotice] = useState<NoticeState>({
-    kind: "idle",
-  })
+  const teamAppearance = defaultsAppearance
+  const savedTeamAppearance = savedDefaultsAppearance
 
-  async function handleSaveAppearance() {
-    try {
-      await saveAppearance()
-      setPersonalNotice({
-        kind: "success",
-        message: "Personal appearance saved.",
-      })
-    } catch (error) {
-      setPersonalNotice({
-        kind: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to save appearance.",
-      })
-    }
-  }
-
-  async function handleResetAppearance() {
-    try {
-      await resetAppearance()
-      setPersonalNotice({
-        kind: "success",
-        message: "Returned to workspace defaults.",
-      })
-    } catch (error) {
-      setPersonalNotice({
-        kind: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to reset appearance.",
-      })
-    }
-  }
-
-  async function handleSaveDefaults() {
+  async function handleSaveTeamAppearance() {
     try {
       await saveDefaultsAppearance()
-      setDefaultsNotice({
+      setTeamNotice({
         kind: "success",
-        message: "Workspace default appearance saved.",
+        message: "Team appearance saved.",
       })
     } catch (error) {
-      setDefaultsNotice({
+      setTeamNotice({
         kind: "error",
         message:
           error instanceof Error
             ? error.message
-            : "Failed to save workspace defaults.",
+            : "Failed to save team appearance.",
       })
     }
   }
@@ -111,19 +71,19 @@ export function UICustomizePanel({ platformName }: { platformName: string }) {
         <div>
           <p className="page-label">Appearance</p>
           <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-            UI Customize
+            Team theme
           </h2>
         </div>
         <TypeTag>
-          {mounted ? `${appearance.mode} / ${appearance.palette}` : "preview"}
+          {mounted ? `${teamAppearance.mode} / ${teamAppearance.palette}` : "preview"}
         </TypeTag>
       </div>
 
       <div className="space-y-5 px-4 py-4">
         <InlineBanner tone="info">
-          Changes preview immediately across the current session. Save to
-          persist your own look, or reset to inherit the workspace defaults
-          again.
+          {canManageDefaults
+            ? "Changes preview immediately across the current session. Save to apply this look across the whole workspace."
+            : "This workspace uses one shared team theme. Workspace admins manage changes for everyone."}
         </InlineBanner>
 
         {loading ? (
@@ -137,71 +97,39 @@ export function UICustomizePanel({ platformName }: { platformName: string }) {
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-5">
-              {personalNotice.kind !== "idle" && personalNotice.message ? (
+              {teamNotice.kind !== "idle" && teamNotice.message ? (
                 <InlineBanner
-                  tone={personalNotice.kind === "success" ? "success" : "error"}
+                  tone={teamNotice.kind === "success" ? "success" : "error"}
                 >
-                  {personalNotice.message}
+                  {teamNotice.message}
                 </InlineBanner>
               ) : null}
 
               <AppearanceEditor
-                description="Override the shared workspace look for your own account."
-                onChange={previewAppearance}
-                onClearAccent={() => previewAppearance({ customAccent: null })}
-                title="My appearance"
-                value={appearance}
+                description={
+                  canManageDefaults
+                    ? "Set the single shared theme every operator uses across this workspace."
+                    : "This workspace uses a single shared team theme."
+                }
+                disabled={!canManageDefaults}
+                onChange={previewDefaultsAppearance}
+                onClearAccent={() =>
+                  previewDefaultsAppearance({ customAccent: null })
+                }
+                title="Team appearance"
+                value={teamAppearance}
               />
 
-              <div className="bg-surface-subtle flex flex-wrap items-center justify-end gap-2 rounded-[var(--radius-lg)] border border-border px-4 py-3">
-                <Button
-                  disabled={!isDirty}
-                  onClick={() => void handleSaveAppearance()}
-                  type="button"
-                >
-                  Save my appearance
-                </Button>
-                <Button
-                  onClick={() => void handleResetAppearance()}
-                  type="button"
-                  variant="outline"
-                >
-                  Reset to workspace default
-                </Button>
-              </div>
-
               {canManageDefaults ? (
-                <>
-                  {defaultsNotice.kind !== "idle" && defaultsNotice.message ? (
-                    <InlineBanner
-                      tone={
-                        defaultsNotice.kind === "success" ? "success" : "error"
-                      }
-                    >
-                      {defaultsNotice.message}
-                    </InlineBanner>
-                  ) : null}
-
-                  <AppearanceEditor
-                    description="Set the base palette every operator inherits until they save a personal override."
-                    onChange={previewDefaultsAppearance}
-                    onClearAccent={() =>
-                      previewDefaultsAppearance({ customAccent: null })
-                    }
-                    title="Workspace defaults"
-                    value={defaultsAppearance}
-                  />
-
-                  <div className="bg-surface-subtle flex justify-end rounded-[var(--radius-lg)] border border-border px-4 py-3">
-                    <Button
-                      disabled={!defaultsDirty}
-                      onClick={() => void handleSaveDefaults()}
-                      type="button"
-                    >
-                      Save workspace defaults
-                    </Button>
-                  </div>
-                </>
+                <div className="bg-surface-subtle flex justify-end rounded-[var(--radius-lg)] border border-border px-4 py-3">
+                  <Button
+                    disabled={!defaultsDirty}
+                    onClick={() => void handleSaveTeamAppearance()}
+                    type="button"
+                  >
+                    Save team appearance
+                  </Button>
+                </div>
               ) : null}
             </div>
 
@@ -222,7 +150,7 @@ export function UICustomizePanel({ platformName }: { platformName: string }) {
                         {platformName}
                       </p>
                     </div>
-                    <TypeTag>{appearance.palette}</TypeTag>
+                    <TypeTag>{teamAppearance.palette}</TypeTag>
                   </div>
                   <Separator className="my-4 bg-border" />
                   <div className="space-y-3">
@@ -236,30 +164,21 @@ export function UICustomizePanel({ platformName }: { platformName: string }) {
                       </Button>
                     </div>
                     <div className="grid gap-2 text-sm text-secondary">
-                      <InfoPill label={appearance.mode} />
-                      <InfoPill label={`${appearance.radius}px radius`} />
-                      <InfoPill label={appearance.density} />
+                      <InfoPill label={teamAppearance.mode} />
+                      <InfoPill label={`${teamAppearance.radius}px radius`} />
+                      <InfoPill label={teamAppearance.density} />
                       <InfoPill
-                        label={appearance.customAccent ?? "preset accent"}
+                        label={teamAppearance.customAccent ?? "preset accent"}
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-background px-4 py-4 text-sm text-secondary">
-                  Saved personal preset: {savedAppearance.mode} /{" "}
-                  {savedAppearance.palette} / {savedAppearance.radius}px /{" "}
-                  {savedAppearance.density}
+                  Saved team preset: {savedTeamAppearance.mode} /{" "}
+                  {savedTeamAppearance.palette} / {savedTeamAppearance.radius}px /{" "}
+                  {savedTeamAppearance.density}
                 </div>
-
-                {canManageDefaults ? (
-                  <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-background px-4 py-4 text-sm text-secondary">
-                    Workspace defaults: {savedDefaultsAppearance.mode} /{" "}
-                    {savedDefaultsAppearance.palette} /{" "}
-                    {savedDefaultsAppearance.radius}px /{" "}
-                    {savedDefaultsAppearance.density}
-                  </div>
-                ) : null}
               </CardContent>
             </Card>
           </div>
@@ -276,12 +195,14 @@ type NoticeState = {
 
 function AppearanceEditor({
   description,
+  disabled = false,
   onChange,
   onClearAccent,
   title,
   value,
 }: {
   description: string
+  disabled?: boolean
   onChange: (patch: Partial<AppearanceSettings>) => void
   onClearAccent: () => void
   title: string
@@ -312,6 +233,7 @@ function AppearanceEditor({
           {appearanceModeOptions.map((option) => (
             <OptionButton
               description={option.description}
+              disabled={disabled}
               key={option.value}
               label={option.label}
               onClick={() => onChange({ mode: option.value as AppearanceMode })}
@@ -333,16 +255,12 @@ function AppearanceEditor({
                 "rounded-[14px] border p-3 text-left transition-colors",
                 value.palette === option.value
                   ? "bg-accent-soft border-[color:var(--accent)]"
-                  : "bg-surface-subtle hover:bg-surface-raised border-border"
+                  : "bg-surface-subtle hover:bg-surface-raised border-border",
+                disabled && "pointer-events-none opacity-55"
               )}
+              disabled={disabled}
               key={option.value}
-              onMouseDown={() =>
-                onChange({ palette: option.value as AppearancePalette })
-              }
               onClick={() =>
-                onChange({ palette: option.value as AppearancePalette })
-              }
-              onPointerUp={() =>
                 onChange({ palette: option.value as AppearancePalette })
               }
               type="button"
@@ -377,6 +295,7 @@ function AppearanceEditor({
             {appearanceRadiusOptions.map((option) => (
               <OptionButton
                 description={option.description}
+                disabled={disabled}
                 key={option.value}
                 label={option.label}
                 onClick={() =>
@@ -397,6 +316,7 @@ function AppearanceEditor({
             {appearanceDensityOptions.map((option) => (
               <OptionButton
                 description={option.description}
+                disabled={disabled}
                 key={option.value}
                 label={option.label}
                 onClick={() =>
@@ -415,6 +335,7 @@ function AppearanceEditor({
         title="Custom accent"
       >
         <CustomAccentField
+          disabled={disabled}
           onChange={(next) => onChange({ customAccent: next })}
           onClear={onClearAccent}
           title={title}
@@ -454,11 +375,13 @@ function OptionGroup({
 
 function OptionButton({
   description,
+  disabled = false,
   label,
   onClick,
   selected,
 }: {
   description: string
+  disabled?: boolean
   label: string
   onClick: () => void
   selected: boolean
@@ -469,11 +392,11 @@ function OptionButton({
         "rounded-[14px] border px-4 py-3 text-left transition-colors",
         selected
           ? "bg-accent-soft border-[color:var(--accent)]"
-          : "bg-surface-subtle hover:bg-surface-raised border-border"
+          : "bg-surface-subtle hover:bg-surface-raised border-border",
+        disabled && "pointer-events-none opacity-55"
       )}
-      onMouseDown={onClick}
+      disabled={disabled}
       onClick={onClick}
-      onPointerUp={onClick}
       type="button"
     >
       <p className="text-sm font-medium text-foreground">{label}</p>
@@ -491,11 +414,13 @@ function InfoPill({ label }: { label: string }) {
 }
 
 function CustomAccentField({
+  disabled = false,
   onChange,
   onClear,
   title,
   value,
 }: {
+  disabled?: boolean
   onChange: (value: string | null) => void
   onClear: () => void
   title: string
@@ -512,6 +437,7 @@ function CustomAccentField({
       <Input
         aria-label={`${title} accent color`}
         className="h-11 p-1"
+        disabled={disabled}
         onChange={(event) => {
           const next = event.target.value.toLowerCase()
           setTextValue(next)
@@ -521,6 +447,7 @@ function CustomAccentField({
         value={value ?? "#4f7cff"}
       />
       <Input
+        disabled={disabled}
         onBlur={() => {
           if (textValue.trim() === "") {
             onChange(null)
@@ -536,6 +463,7 @@ function CustomAccentField({
         value={textValue}
       />
       <Button
+        disabled={disabled}
         onClick={() => {
           setTextValue("")
           onClear()
