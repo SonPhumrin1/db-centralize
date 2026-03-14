@@ -44,8 +44,9 @@ func main() {
 		log.Fatalf("cache connection failed: %v", err)
 	}
 
+	externalPoolManager := usecase.NewExternalDataSourcePoolManager()
 	dataSourceRepo := repository.NewDataSourceRepository(gormDB)
-	dataSourceUsecase := usecase.NewDataSourceUsecase(dataSourceRepo, cfg.EncryptionKeyRaw, redisClient)
+	dataSourceUsecase := usecase.NewDataSourceUsecase(dataSourceRepo, cfg.EncryptionKeyRaw, redisClient, externalPoolManager)
 	dataSourceHandler := handler.NewDataSourceHandler(dataSourceUsecase)
 	queryRepo := repository.NewQueryRepository(gormDB)
 	endpointRepo := repository.NewEndpointRepository(gormDB)
@@ -55,7 +56,7 @@ func main() {
 	userRepo := repository.NewUserRepository(gormDB)
 	systemSettingsRepo := repository.NewSystemSettingsRepository(gormDB)
 	apiKeyRepo := repository.NewAPIKeyRepository(gormDB)
-	queryUsecase := usecase.NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, cfg.EncryptionKeyRaw)
+	queryUsecase := usecase.NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, cfg.EncryptionKeyRaw, externalPoolManager)
 	queryHandler := handler.NewQueryHandler(queryUsecase)
 	telegramIntegrationUsecase := usecase.NewTelegramIntegrationUsecase(telegramIntegrationRepo, cfg.EncryptionKeyRaw)
 	pipelineUsecase := usecase.NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramIntegrationRepo, queryUsecase, telegramIntegrationUsecase.SendPipelineMessage)

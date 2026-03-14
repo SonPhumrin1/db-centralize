@@ -110,12 +110,12 @@ func (h *QueryHandler) Run(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid query id"})
 	}
 
-	rows, err := h.usecase.Run(c.Context(), id, userID)
+	result, err := h.usecase.Run(c.Context(), id, userID)
 	if err != nil {
 		return mapQueryError(c, err)
 	}
 
-	return c.JSON(rows)
+	return c.JSON(result)
 }
 
 func (h *QueryHandler) RunDraft(c fiber.Ctx) error {
@@ -132,12 +132,12 @@ func (h *QueryHandler) RunDraft(c fiber.Ctx) error {
 		return validationFailed(c, errs...)
 	}
 
-	rows, err := h.usecase.RunInput(c.Context(), userID, input)
+	result, err := h.usecase.RunInput(c.Context(), userID, input)
 	if err != nil {
 		return mapQueryError(c, err)
 	}
 
-	return c.JSON(rows)
+	return c.JSON(result)
 }
 
 func mapQueryError(c fiber.Ctx, err error) error {

@@ -49,6 +49,16 @@ type QueryRunOptions struct {
 	RowLimit int
 }
 
+type QueryRunBenchmark struct {
+	BackendMS int64 `json:"backendMs"`
+	RowCount  int   `json:"rowCount"`
+}
+
+type QueryRunResult struct {
+	Rows      []map[string]any  `json:"rows"`
+	Benchmark QueryRunBenchmark `json:"benchmark"`
+}
+
 type QueryView struct {
 	ID           uint      `json:"id"`
 	DataSourceID uint      `json:"dataSourceId"`
@@ -118,6 +128,7 @@ type QueryUsecase struct {
 	endpointRepo   repository.EndpointRepository
 	encryptionKey  []byte
 	restAdapter    *RESTAdapter
+	poolManager    *ExternalDataSourcePoolManager
 }
 
 func NewQueryUsecase(
@@ -125,13 +136,19 @@ func NewQueryUsecase(
 	dataSourceRepo repository.DataSourceRepository,
 	endpointRepo repository.EndpointRepository,
 	encryptionKey []byte,
+	poolManager *ExternalDataSourcePoolManager,
 ) *QueryUsecase {
+	if poolManager == nil {
+		poolManager = NewExternalDataSourcePoolManager()
+	}
+
 	return &QueryUsecase{
 		queryRepo:      queryRepo,
 		dataSourceRepo: dataSourceRepo,
 		endpointRepo:   endpointRepo,
 		encryptionKey:  encryptionKey,
 		restAdapter:    NewRESTAdapter(encryptionKey),
+		poolManager:    poolManager,
 	}
 }
 
@@ -193,7 +210,7 @@ func (u *QueryUsecase) Delete(ctx context.Context, id, userID uint) error {
 	return u.queryRepo.Delete(ctx, id, userID)
 }
 
-func (u *QueryUsecase) Run(ctx context.Context, id, userID uint) ([]map[string]any, error) {
+func (u *QueryUsecase) Run(ctx context.Context, id, userID uint) (*QueryRunResult, error) {
 	query, err := u.queryRepo.FindByID(ctx, id, userID)
 	if err != nil {
 		return nil, err
@@ -207,7 +224,7 @@ func (u *QueryUsecase) Run(ctx context.Context, id, userID uint) ([]map[string]a
 	return u.executeAgainstSource(ctx, *source, query.Body, QueryRunOptions{})
 }
 
-func (u *QueryUsecase) RunInput(ctx context.Context, userID uint, input RunQueryInput) ([]map[string]any, error) {
+func (u *QueryUsecase) RunInput(ctx context.Context, userID uint, input RunQueryInput) (*QueryRunResult, error) {
 	source, err := u.dataSourceRepo.FindByID(ctx, input.DataSourceID, userID)
 	if err != nil {
 		return nil, err
@@ -221,6 +238,15 @@ func (u *QueryUsecase) RunInput(ctx context.Context, userID uint, input RunQuery
 }
 
 func (u *QueryUsecase) RunSavedWithOptions(ctx context.Context, id, userID uint, options QueryRunOptions) ([]map[string]any, error) {
+	result, err := u.RunSavedWithOptionsDetailed(ctx, id, userID, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.Rows, nil
+}
+
+func (u *QueryUsecase) RunSavedWithOptionsDetailed(ctx context.Context, id, userID uint, options QueryRunOptions) (*QueryRunResult, error) {
 	query, err := u.queryRepo.FindByID(ctx, id, userID)
 	if err != nil {
 		return nil, err
@@ -268,7 +294,7 @@ func (u *QueryUsecase) buildQueryModel(
 	}, nil
 }
 
-func (u *QueryUsecase) executeAgainstSource(ctx context.Context, source model.DataSource, body string, options QueryRunOptions) ([]map[string]any, error) {
+func (u *QueryUsecase) executeAgainstSource(ctx context.Context, source model.DataSource, body string, options QueryRunOptions) (*QueryRunResult, error) {
 	if strings.TrimSpace(body) == "" {
 		return nil, ErrEmptyQueryBody
 	}
@@ -287,17 +313,71 @@ func (u *QueryUsecase) executeAgainstSource(ctx context.Context, source model.Da
 	}
 }
 
-func (u *QueryUsecase) RunAgainstSource(ctx context.Context, source model.DataSource, queryBody string, options QueryRunOptions) ([]map[string]any, error) {
+func (u *QueryUsecase) RunAgainstSource(ctx context.Context, source model.DataSource, queryBody string, options QueryRunOptions) (*QueryRunResult, error) {
 	config, err := decryptDataSourceConfig(u.encryptionKey, source.ConfigEncrypted)
 	if err != nil {
 		return nil, err
 	}
 
-	db, closeFn, err := openDatabaseConnection(source.Type, config)
+	identity := ExternalDataSourceIdentity{
+		UserID:     source.UserID,
+		SourceID:   source.ID,
+		SourceType: source.Type,
+		Config:     config,
+	}
+
+	startedAt := time.Now()
+	rows, err := u.runAgainstSQLSourceOnce(ctx, identity, queryBody, options)
+	if err != nil {
+		if !isRetryableExternalDBError(err) {
+			return nil, err
+		}
+
+		u.poolManager.Invalidate(identity)
+		startedAt = time.Now()
+		rows, err = u.runAgainstSQLSourceOnce(ctx, identity, queryBody, options)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	u.touchDataSourceActivity(ctx, source)
+	return &QueryRunResult{
+		Rows: rows,
+		Benchmark: QueryRunBenchmark{
+			BackendMS: time.Since(startedAt).Milliseconds(),
+			RowCount:  len(rows),
+		},
+	}, nil
+}
+
+func (u *QueryUsecase) FetchREST(ctx context.Context, source model.DataSource, request restrequest.Request, options QueryRunOptions) (*QueryRunResult, error) {
+	startedAt := time.Now()
+	rows, err := u.restAdapter.Execute(ctx, source, applyRESTRuntimeParams(request, options.Params))
 	if err != nil {
 		return nil, err
 	}
-	defer closeFn()
+
+	u.touchDataSourceActivity(ctx, source)
+	return &QueryRunResult{
+		Rows: rows,
+		Benchmark: QueryRunBenchmark{
+			BackendMS: time.Since(startedAt).Milliseconds(),
+			RowCount:  len(rows),
+		},
+	}, nil
+}
+
+func (u *QueryUsecase) runAgainstSQLSourceOnce(
+	ctx context.Context,
+	identity ExternalDataSourceIdentity,
+	queryBody string,
+	options QueryRunOptions,
+) ([]map[string]any, error) {
+	db, err := u.poolManager.Acquire(ctx, identity)
+	if err != nil {
+		return nil, err
+	}
 
 	normalizedQuery := normalizeNamedQuery(queryBody)
 	args := namedArguments(options.Params)
@@ -311,23 +391,8 @@ func (u *QueryUsecase) RunAgainstSource(ctx context.Context, source model.DataSo
 	if rowLimit <= 0 {
 		rowLimit = queryResultRowLimit
 	}
-	result, err := scanRowsToMap(rows, rowLimit)
-	if err != nil {
-		return nil, err
-	}
 
-	u.touchDataSourceActivity(ctx, source)
-	return result, nil
-}
-
-func (u *QueryUsecase) FetchREST(ctx context.Context, source model.DataSource, request restrequest.Request, options QueryRunOptions) ([]map[string]any, error) {
-	rows, err := u.restAdapter.Execute(ctx, source, applyRESTRuntimeParams(request, options.Params))
-	if err != nil {
-		return nil, err
-	}
-
-	u.touchDataSourceActivity(ctx, source)
-	return rows, nil
+	return scanRowsToMap(rows, rowLimit)
 }
 
 func (u *QueryUsecase) touchDataSourceActivity(ctx context.Context, source model.DataSource) {

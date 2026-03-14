@@ -1,9 +1,18 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Copy, Plus, Trash2 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { ChevronDown, ChevronRight, Copy, Plus, Trash2 } from "lucide-react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   InlineBanner,
   PageHeader,
@@ -203,6 +212,7 @@ export function EndpointsWorkspace() {
   const queryClient = useQueryClient()
   const [notice, setNotice] = useState<NoticeState>({ kind: "idle" })
   const [form, setForm] = useState<EndpointFormState>(emptyForm())
+  const [editorOpen, setEditorOpen] = useState(false)
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null)
   const [endpointPendingDelete, setEndpointPendingDelete] = useState<Endpoint | null>(
     null
@@ -273,6 +283,7 @@ export function EndpointsWorkspace() {
           }),
     onSuccess: async (endpoint) => {
       setForm(formFromEndpoint(endpoint))
+      setEditorOpen(false)
       setSelectedEndpointId(endpoint.id)
       setNotice({
         kind: "success",
@@ -349,6 +360,17 @@ export function EndpointsWorkspace() {
     })
   }
 
+  function openNewEndpointDialog(kind: EndpointTargetKind = "query") {
+    resetForm(kind)
+    setEditorOpen(true)
+  }
+
+  function openEditEndpointDialog(endpoint: Endpoint) {
+    setForm(formFromEndpoint(endpoint))
+    setEditorOpen(true)
+    setSelectedEndpointId(endpoint.id)
+  }
+
   function saveEndpoint() {
     if (!form.name.trim()) {
       setNotice({ kind: "error", message: "Endpoint name is required." })
@@ -382,16 +404,9 @@ export function EndpointsWorkspace() {
       <PageHeader
         actions={
           <div className="flex gap-2">
-            <Button
-              onClick={() => resetForm("query")}
-              type="button"
-              variant="outline"
-            >
+            <Button onClick={() => openNewEndpointDialog("query")} type="button">
               <Plus className="size-4" />
-              New endpoint
-            </Button>
-            <Button onClick={saveEndpoint} type="button">
-              {saveMutation.isPending ? "Saving..." : form.id ? "Update" : "Publish"}
+              Add new
             </Button>
           </div>
         }
@@ -445,17 +460,242 @@ export function EndpointsWorkspace() {
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(360px,0.44fr)_minmax(0,0.56fr)]">
-        <article className="panel">
+      <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="page-label">Publish endpoint</p>
+              <p className="page-label">Published endpoints</p>
               <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-                {form.id ? "Edit contract" : "New contract"}
+                Contracts
               </h2>
             </div>
           </div>
           <div className="panel-body space-y-4">
+            {endpointsQuery.isLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-24 w-full" />
+              ))
+            ) : null}
+
+            {!endpointsQuery.isLoading && endpoints.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="data-table min-w-[980px]">
+                  <thead>
+                    <tr>
+                      <th className="w-[64px]">View</th>
+                      <th>Name</th>
+                      <th>Target</th>
+                      <th>Method</th>
+                      <th>Auth</th>
+                      <th>Pagination</th>
+                      <th>Status</th>
+                      <th className="w-[220px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {endpoints.map((endpoint) => {
+                      const expanded = selectedEndpointId === endpoint.id
+
+                      return (
+                        <Fragment key={endpoint.id}>
+                          <tr className="data-row">
+                            <td>
+                              <Button
+                                onClick={() =>
+                                  setSelectedEndpointId((current) =>
+                                    current === endpoint.id ? null : endpoint.id
+                                  )
+                                }
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                {expanded ? (
+                                  <ChevronDown className="size-4" />
+                                ) : (
+                                  <ChevronRight className="size-4" />
+                                )}
+                              </Button>
+                            </td>
+                            <td>
+                              <div>
+                                <p className="font-medium">{endpoint.name}</p>
+                                <p className="mt-1 text-xs text-secondary">{endpoint.slug}</p>
+                              </div>
+                            </td>
+                            <td>{targetLabel(endpoint, queryMap, pipelineMap)}</td>
+                            <td>{endpoint.invokeMethod ?? "GET"}</td>
+                            <td>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span>{endpoint.authMode}</span>
+                                {endpoint.requiresMigration ? (
+                                  <StatusBadge label="Legacy" tone="warning" />
+                                ) : null}
+                              </div>
+                            </td>
+                            <td>{endpoint.paginationMode}</td>
+                            <td>
+                              <StatusBadge
+                                label={endpoint.isActive ? "Active" : "Draft"}
+                                tone={endpoint.isActive ? "success" : "muted"}
+                              />
+                            </td>
+                            <td>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  onClick={() => activateMutation.mutate(endpoint)}
+                                  size="sm"
+                                  type="button"
+                                  variant="outline"
+                                >
+                                  {endpoint.isActive ? "Deactivate" : "Activate"}
+                                </Button>
+                                <Button
+                                  onClick={() => openEditEndpointDialog(endpoint)}
+                                  size="sm"
+                                  type="button"
+                                  variant="outline"
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  onClick={() => setEndpointPendingDelete(endpoint)}
+                                  size="sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {expanded ? (
+                            <tr>
+                              <td className="bg-surface-raised px-4 py-4" colSpan={8}>
+                                <div className="space-y-4">
+                                  <div className="grid gap-3 rounded-[8px] border border-border px-3 py-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div>
+                                        <p className="page-label">Invoke URL</p>
+                                        <p className="mt-1 font-mono text-sm break-all">
+                                          {endpointUrl(endpoint.publicId)}
+                                        </p>
+                                      </div>
+                                      <Button
+                                        onClick={() =>
+                                          copyText(
+                                            endpointUrl(endpoint.publicId),
+                                            "Invoke URL copied."
+                                          )
+                                        }
+                                        size="sm"
+                                        type="button"
+                                        variant="ghost"
+                                      >
+                                        <Copy className="size-4" />
+                                      </Button>
+                                    </div>
+                                    <div>
+                                      <p className="page-label">Request preview</p>
+                                      <pre className="mt-1 overflow-x-auto rounded-[8px] bg-surface-raised px-3 py-3 text-xs text-secondary">
+                                        {buildCurlPreview(endpoint)}
+                                      </pre>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-3">
+                                    <p className="page-label">Execution logs</p>
+                                    {logsQuery.isLoading ? (
+                                      <Skeleton className="h-32 w-full" />
+                                    ) : (logsQuery.data ?? []).length === 0 ? (
+                                      <div className="rounded-[8px] border border-border px-3 py-3 text-sm text-secondary">
+                                        No execution logs yet.
+                                      </div>
+                                    ) : (
+                                      <div className="overflow-x-auto">
+                                        <table className="data-table min-w-full">
+                                          <thead>
+                                            <tr>
+                                              <th>Status</th>
+                                              <th>Auth</th>
+                                              <th>Performance</th>
+                                              <th>Ran at</th>
+                                              <th>Error</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {(logsQuery.data ?? []).map((item) => (
+                                              <tr key={item.id} className="data-row">
+                                                <td>
+                                                  <StatusBadge
+                                                    label={String(item.statusCode)}
+                                                    tone={item.statusCode < 400 ? "success" : "error"}
+                                                  />
+                                                </td>
+                                                <td className="text-secondary">
+                                                  {item.authMode}
+                                                  {item.apiKeyPrefix ? ` • ${item.apiKeyPrefix}` : ""}
+                                                </td>
+                                                <td className="text-secondary">
+                                                  {item.durationMs} ms • {item.rowCount} rows
+                                                </td>
+                                                <td className="text-secondary">
+                                                  {formatUtcDateTime(item.ranAt, {
+                                                    includeSeconds: true,
+                                                  })}
+                                                </td>
+                                                <td className="text-[color:var(--danger)]">
+                                                  {item.errorExcerpt || "None"}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {!endpointsQuery.isLoading && endpoints.length === 0 ? (
+              <div className="rounded-[10px] border border-border px-4 py-4 text-sm text-secondary">
+                No endpoints published yet. Save a query or pipeline first, then
+                publish it here explicitly.
+              </div>
+            ) : null}
+          </div>
+      </section>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (saveMutation.isPending) {
+            return
+          }
+
+          setEditorOpen(open)
+        }}
+        open={editorOpen}
+      >
+        <AlertDialogContent className="w-[min(92vw,56rem)] max-w-[56rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {form.id ? "Edit endpoint" : "Publish endpoint"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose the target, auth, pagination, and supported params for this endpoint contract.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
             <label className="grid gap-1.5">
               <span className="field-label">Target type</span>
               <select
@@ -497,68 +737,72 @@ export function EndpointsWorkspace() {
               </select>
             </label>
 
-            <label className="grid gap-1.5">
-              <span className="field-label">Endpoint name</span>
-              <Input
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
-                }
-                value={form.name}
-              />
-            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-1.5">
+                <span className="field-label">Endpoint name</span>
+                <Input
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  value={form.name}
+                />
+              </label>
 
-            <label className="grid gap-1.5">
-              <span className="field-label">Slug</span>
-              <Input
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, slug: event.target.value }))
-                }
-                placeholder="auto-generated if blank"
-                value={form.slug}
-              />
-            </label>
+              <label className="grid gap-1.5">
+                <span className="field-label">Slug</span>
+                <Input
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, slug: event.target.value }))
+                  }
+                  placeholder="auto-generated if blank"
+                  value={form.slug}
+                />
+              </label>
+            </div>
 
-            <label className="grid gap-1.5">
-              <span className="field-label">Auth mode</span>
-              <select
-                className="field-select"
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    authMode: event.target.value as EndpointAuthMode,
-                  }))
-                }
-                value={form.authMode}
-              >
-                {endpointAuthModeOptions
-                  .filter((option) => option.value !== "legacy_basic" || form.id)
-                  .map((option) => (
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-1.5">
+                <span className="field-label">Auth mode</span>
+                <select
+                  className="field-select"
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      authMode: event.target.value as EndpointAuthMode,
+                    }))
+                  }
+                  value={form.authMode}
+                >
+                  {endpointAuthModeOptions
+                    .filter((option) => option.value !== "legacy_basic" || form.id)
+                    .map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1.5">
+                <span className="field-label">Pagination</span>
+                <select
+                  className="field-select"
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      paginationMode: event.target.value as EndpointPaginationMode,
+                    }))
+                  }
+                  value={form.paginationMode}
+                >
+                  {endpointPaginationModeOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
-              </select>
-            </label>
-
-            <label className="grid gap-1.5">
-              <span className="field-label">Pagination</span>
-              <select
-                className="field-select"
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    paginationMode: event.target.value as EndpointPaginationMode,
-                  }))
-                }
-                value={form.paginationMode}
-              >
-                {endpointPaginationModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                </select>
+              </label>
+            </div>
 
             {form.paginationMode !== "none" ? (
               <div className="grid gap-3 md:grid-cols-2">
@@ -609,8 +853,7 @@ export function EndpointsWorkspace() {
                 <div>
                   <p className="field-label">Parameters</p>
                   <p className="text-sm text-secondary">
-                    Define supported named params like `class_id`, `page`, or
-                    `cursor`.
+                    Define supported named params like `class_id`, `page`, or `cursor`.
                   </p>
                 </div>
                 <Button
@@ -630,8 +873,7 @@ export function EndpointsWorkspace() {
 
               {form.parameters.length === 0 ? (
                 <div className="rounded-[8px] border border-border px-3 py-3 text-sm text-secondary">
-                  No explicit parameters yet. Requests can still send pagination
-                  params if pagination is enabled.
+                  No explicit parameters yet. Requests can still send pagination params if pagination is enabled.
                 </div>
               ) : null}
 
@@ -740,183 +982,21 @@ export function EndpointsWorkspace() {
               ))}
             </div>
           </div>
-        </article>
 
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="page-label">Published endpoints</p>
-              <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-                Contracts
-              </h2>
-            </div>
-          </div>
-          <div className="panel-body space-y-4">
-            {endpointsQuery.isLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <Skeleton key={index} className="h-24 w-full" />
-              ))
-            ) : null}
-
-            {endpoints.map((endpoint) => (
-              <article
-                key={endpoint.id}
-                className="rounded-[10px] border border-border px-4 py-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{endpoint.name}</p>
-                      <StatusBadge
-                        label={endpoint.isActive ? "Active" : "Draft"}
-                        tone={endpoint.isActive ? "success" : "muted"}
-                      />
-                      {endpoint.requiresMigration ? (
-                        <StatusBadge label="Legacy auth" tone="warning" />
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm text-secondary">
-                      {endpoint.slug} • {targetLabel(endpoint, queryMap, pipelineMap)}
-                    </p>
-                    <p className="mt-1 text-xs text-secondary">
-                      {endpoint.invokeMethod ?? "GET"} • {endpoint.authMode} •{" "}
-                      {endpoint.paginationMode}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      onClick={() =>
-                        activateMutation.mutate(endpoint)
-                      }
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      {endpoint.isActive ? "Deactivate" : "Activate"}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setForm(formFromEndpoint(endpoint))
-                        setSelectedEndpointId(endpoint.id)
-                      }}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      onClick={() => setEndpointPendingDelete(endpoint)}
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 rounded-[8px] border border-border px-3 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="page-label">Invoke URL</p>
-                      <p className="mt-1 font-mono text-sm break-all">
-                        {endpointUrl(endpoint.publicId)}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() =>
-                        copyText(
-                          endpointUrl(endpoint.publicId),
-                          "Invoke URL copied."
-                        )
-                      }
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Copy className="size-4" />
-                    </Button>
-                  </div>
-                  <div>
-                    <p className="page-label">Request preview</p>
-                    <pre className="mt-1 overflow-x-auto rounded-[8px] bg-surface-raised px-3 py-3 text-xs text-secondary">
-                      {buildCurlPreview(endpoint)}
-                    </pre>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      onClick={() =>
-                        setSelectedEndpointId((current) =>
-                          current === endpoint.id ? null : endpoint.id
-                        )
-                      }
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      {selectedEndpointId === endpoint.id ? "Hide logs" : "Show logs"}
-                    </Button>
-                  </div>
-                </div>
-
-                {selectedEndpointId === endpoint.id ? (
-                  <div className="mt-4 space-y-3">
-                    <p className="page-label">Execution logs</p>
-                    {logsQuery.isLoading ? (
-                      <Skeleton className="h-32 w-full" />
-                    ) : (logsQuery.data ?? []).length === 0 ? (
-                      <div className="rounded-[8px] border border-border px-3 py-3 text-sm text-secondary">
-                        No execution logs yet.
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {(logsQuery.data ?? []).map((item) => (
-                          <div
-                            key={item.id}
-                            className="rounded-[8px] border border-border px-3 py-3 text-sm"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <StatusBadge
-                                label={String(item.statusCode)}
-                                tone={item.statusCode < 400 ? "success" : "error"}
-                              />
-                              <span className="text-secondary">
-                                {item.authMode}
-                                {item.apiKeyPrefix ? ` • ${item.apiKeyPrefix}` : ""}
-                              </span>
-                              <span className="text-secondary">
-                                {item.durationMs} ms • {item.rowCount} rows
-                              </span>
-                            </div>
-                            <p className="mt-1 text-secondary">
-                              {formatUtcDateTime(item.ranAt, {
-                                includeSeconds: true,
-                              })}
-                            </p>
-                            {item.errorExcerpt ? (
-                              <p className="mt-2 text-[color:var(--danger)]">
-                                {item.errorExcerpt}
-                              </p>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-
-            {!endpointsQuery.isLoading && endpoints.length === 0 ? (
-              <div className="rounded-[10px] border border-border px-4 py-4 text-sm text-secondary">
-                No endpoints published yet. Save a query or pipeline first, then
-                publish it here explicitly.
-              </div>
-            ) : null}
-          </div>
-        </article>
-      </section>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saveMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <Button onClick={saveEndpoint} type="button">
+              {saveMutation.isPending
+                ? "Saving..."
+                : form.id
+                  ? "Update endpoint"
+                  : "Publish endpoint"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ConfirmActionDialog
         confirmLabel="Delete endpoint"

@@ -102,16 +102,16 @@ export function DashboardSidebar({
               <div
                 aria-hidden={!expanded}
                 className={cn(
-                  "min-w-0 overflow-hidden transition-[max-width,opacity,transform] duration-220 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  "min-w-0 flex-1 overflow-hidden transition-[max-width,opacity,transform] duration-220 ease-[cubic-bezier(0.22,1,0.36,1)]",
                   expanded
-                    ? "max-w-[152px] opacity-100 translate-x-0"
+                    ? "max-w-[200px] opacity-100 translate-x-0"
                     : "max-w-0 opacity-0 -translate-x-1"
                 )}
               >
                 <p className="truncate font-mono text-[10px] tracking-[0.14em] text-[color:var(--sidebar-subtle)] uppercase">
                   {platformName}
                 </p>
-                <p className="mt-1 truncate whitespace-nowrap text-[13px] font-medium leading-[1.15] text-[color:var(--sidebar-foreground)]">
+                <p className="mt-1 text-[13px] font-medium leading-[1.2] text-[color:var(--sidebar-foreground)]">
                   Operations Console
                 </p>
               </div>

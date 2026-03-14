@@ -210,8 +210,8 @@ func newIsolationApp(t *testing.T, gormDB *gorm.DB) (*fiber.App, isolationFixtur
 	pipelineRepo := repository.NewPipelineRepository(gormDB)
 	telegramRepo := repository.NewTelegramIntegrationRepository(gormDB)
 	systemSettingsRepo := repository.NewSystemSettingsRepository(gormDB)
-	queryUC := usecase.NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, isolationEncryptionKey)
-	dataSourceUC := usecase.NewDataSourceUsecase(dataSourceRepo, isolationEncryptionKey, nil)
+	queryUC := usecase.NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, isolationEncryptionKey, nil)
+	dataSourceUC := usecase.NewDataSourceUsecase(dataSourceRepo, isolationEncryptionKey, nil, nil)
 	pipelineUC := usecase.NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
 	endpointUC := usecase.NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 

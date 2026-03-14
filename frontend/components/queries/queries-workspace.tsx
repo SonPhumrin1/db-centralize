@@ -28,12 +28,15 @@ import {
   TypeTag,
 } from "@/components/dashboard/platform-ui"
 import { ConfirmActionDialog } from "@/components/shared/confirm-action-dialog"
+import { SchemaDetailsDialog } from "@/components/shared/schema-details-dialog"
 import { RestRequestBuilder } from "@/components/shared/rest-request-builder"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  countSchemaTables,
   type DataSource,
+  type SchemaTable,
   type SchemaResult,
   sourceTypeOptions,
 } from "@/lib/datasources"
@@ -41,6 +44,7 @@ import {
   buildSqlAutocompleteSchema,
   inferDefaultSqlTable,
   type QueryResultRow,
+  type QueryRunResponse,
   type RunQueryInput,
   type SavedQuery,
   type SaveQueryInput,
@@ -73,6 +77,12 @@ type ResultFilter = {
   column: string
   operator: "contains" | "equals" | "not_equals" | ">" | "<"
   value: string
+}
+
+type SchemaDialogState = {
+  title: string
+  description: string
+  tables: Array<SchemaTable & { schemaName: string }>
 }
 
 const emptyDraft: QueryDraft = {
@@ -227,7 +237,8 @@ export function QueriesWorkspace() {
   const [notice, setNotice] = useState<NoticeState>({ kind: "idle" })
   const [queryPendingDelete, setQueryPendingDelete] = useState<SavedQuery | null>(null)
   const [activeTab, setActiveTab] = useState<ResultTab>("editor")
-  const [executionMs, setExecutionMs] = useState<number | null>(null)
+  const [backendExecutionMs, setBackendExecutionMs] = useState<number | null>(null)
+  const [totalExecutionMs, setTotalExecutionMs] = useState<number | null>(null)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null)
   const [selectedRowRange, setSelectedRowRange] = useState<{ start: number; end: number } | null>(null)
   const [selectedCell, setSelectedCell] = useState<{ rowIndex: number; column: string; value: unknown } | null>(null)
@@ -240,6 +251,7 @@ export function QueriesWorkspace() {
   const [sortState, setSortState] = useState<{ column: string; direction: "asc" | "desc" } | null>(null)
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(1)
+  const [schemaDialog, setSchemaDialog] = useState<SchemaDialogState | null>(null)
 
   const sourcesQuery = useQuery({
     queryKey: ["datasources"],
@@ -307,26 +319,35 @@ export function QueriesWorkspace() {
   const runMutation = useMutation({
     mutationFn: async (payload: RunQueryInput) => {
       const startedAt = performance.now()
-      const rows = await fetchJson<QueryResultRow[]>("/api/platform/queries/run", {
+      const response = await fetchJson<QueryRunResponse>("/api/platform/queries/run", {
         method: "POST",
         body: JSON.stringify(payload),
       })
 
-      return { rows, duration: Math.max(1, Math.round(performance.now() - startedAt)) }
+      return {
+        response,
+        duration: Math.max(1, Math.round(performance.now() - startedAt)),
+      }
     },
-    onSuccess: ({ rows, duration }) => {
+    onSuccess: ({ response, duration }) => {
+      const rows = response.rows
       setResults(rows)
-      setExecutionMs(duration)
+      setBackendExecutionMs(response.benchmark.backendMs)
+      setTotalExecutionMs(duration)
       setSelectedRowIndex(rows.length > 0 ? 0 : null)
       setSelectedRowRange(null)
       setSelectedCell(null)
       setPage(1)
       setActiveTab("results")
-      setNotice({ kind: "success", message: rows.length > 0 ? `Run completed with ${rows.length} rows.` : "No rows returned." })
+      setNotice({
+        kind: "success",
+        message: rows.length > 0 ? `Run completed with ${response.benchmark.rowCount} rows.` : "No rows returned.",
+      })
     },
     onError: (error) => {
       setResults([])
-      setExecutionMs(null)
+      setBackendExecutionMs(null)
+      setTotalExecutionMs(null)
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "Failed to run query." })
       setActiveTab("results")
     },
@@ -420,7 +441,8 @@ export function QueriesWorkspace() {
     setSelectedQueryId(null)
     setDraft({ ...emptyDraft, dataSourceId: sourcesQuery.data?.[0]?.id ?? 0 })
     setResults([])
-    setExecutionMs(null)
+    setBackendExecutionMs(null)
+    setTotalExecutionMs(null)
     setSelectedRowIndex(null)
     setSelectedRowRange(null)
     setSelectedCell(null)
@@ -438,7 +460,8 @@ export function QueriesWorkspace() {
       restRequest: parseRestRequestBody(query.body),
     })
     setResults([])
-    setExecutionMs(null)
+    setBackendExecutionMs(null)
+    setTotalExecutionMs(null)
     setSelectedRowIndex(null)
     setSelectedRowRange(null)
     setSelectedCell(null)
@@ -716,7 +739,9 @@ export function QueriesWorkspace() {
                   <TypeTag>{selectedSource?.type === "rest" ? "REST" : "SQL"}</TypeTag>
                   <span>{selectedSource ? sourceLabel(selectedSource) : "Select a source"}</span>
                   {selectedSource && selectedSource.type !== "rest" ? (
-                    <span className="mono-value">{schemaQuery.data ? `${schemaQuery.data.tables.length} tables indexed` : "Schema loading"}</span>
+                    <span className="mono-value">
+                      {schemaQuery.data ? `${countSchemaTables(schemaQuery.data)} tables indexed` : "Schema loading"}
+                    </span>
                   ) : null}
                 </div>
               </div>
@@ -773,7 +798,9 @@ export function QueriesWorkspace() {
                 <div>
                   <div className="toolbar">
                     <div className="mono-value text-secondary">
-                      {formatNumber(filteredRows.length)} rows{executionMs ? ` / ${executionMs}ms` : ""}
+                      {formatNumber(filteredRows.length)} rows
+                      {backendExecutionMs !== null ? ` / backend ${backendExecutionMs}ms` : ""}
+                      {totalExecutionMs !== null ? ` / total ${totalExecutionMs}ms` : ""}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Button onClick={exportCsv} size="sm" type="button" variant="ghost">
@@ -1104,10 +1131,50 @@ export function QueriesWorkspace() {
                       {selectedSource?.type === "rest" ? (
                         <p className="mt-3 text-sm text-secondary">REST sources use request structure instead of table metadata.</p>
                       ) : schemaQuery.data ? (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {schemaQuery.data.tables.slice(0, 16).map((table) => (
-                            <TypeTag key={table}>{table}</TypeTag>
-                          ))}
+                        <div className="mt-3 space-y-3">
+                          <div className="flex flex-wrap gap-2">
+                            {schemaQuery.data.schemas.map((namespace) => {
+                              const columnCount = namespace.tables.reduce(
+                                (total, table) => total + table.columns.length,
+                                0
+                              )
+
+                              return (
+                                <button
+                                  key={namespace.name}
+                                  className={cn(
+                                    "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                                    namespace.tables.length > 0
+                                      ? "border-border bg-surface-subtle text-foreground hover:bg-accent-soft"
+                                      : "cursor-not-allowed border-border bg-surface text-secondary opacity-60"
+                                  )}
+                                  disabled={namespace.tables.length === 0}
+                                  onClick={() =>
+                                    setSchemaDialog({
+                                      title: `${namespace.name} schema`,
+                                      description: `Inspect tables and fields available in ${namespace.name}.`,
+                                      tables: namespace.tables.map((table) => ({
+                                        ...table,
+                                        schemaName: namespace.name,
+                                      })),
+                                    })
+                                  }
+                                  type="button"
+                                >
+                                  <span className="font-medium">{namespace.name}</span>
+                                  <span className="text-xs text-secondary">
+                                    {namespace.tables.length} tables
+                                  </span>
+                                  <span className="text-xs text-secondary">
+                                    {columnCount} fields
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <p className="text-sm text-secondary">
+                            Tap a schema chip to inspect its tables and fields.
+                          </p>
                         </div>
                       ) : (
                         <p className="mt-3 text-sm text-secondary">Schema metadata loads after source selection.</p>
@@ -1142,6 +1209,18 @@ export function QueriesWorkspace() {
         open={Boolean(queryPendingDelete)}
         pending={deleteMutation.isPending}
         title="Delete saved query?"
+      />
+
+      <SchemaDetailsDialog
+        description={schemaDialog?.description ?? ""}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSchemaDialog(null)
+          }
+        }}
+        open={Boolean(schemaDialog)}
+        tables={schemaDialog?.tables ?? []}
+        title={schemaDialog?.title ?? "Schema details"}
       />
     </main>
   )

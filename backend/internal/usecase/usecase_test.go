@@ -75,7 +75,7 @@ func TestDataSourceUsecaseRestLifecycle(t *testing.T) {
 	db := testutil.OpenTestDB(t)
 	ctx := context.Background()
 	repo := repository.NewDataSourceRepository(db)
-	uc := NewDataSourceUsecase(repo, testEncryptionKey, nil)
+	uc := NewDataSourceUsecase(repo, testEncryptionKey, nil, nil)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
@@ -143,7 +143,7 @@ func TestQueryAndEndpointUsecasesWithRESTSource(t *testing.T) {
 	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
 	pipelineRepo := repository.NewPipelineRepository(db)
 	telegramRepo := repository.NewTelegramIntegrationRepository(db)
-	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey, nil)
 	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
 	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 
@@ -166,12 +166,15 @@ func TestQueryAndEndpointUsecasesWithRESTSource(t *testing.T) {
 		t.Fatalf("create query: %v", err)
 	}
 
-	rows, err := queryUC.Run(ctx, query.ID, owner.ID)
+	runResult, err := queryUC.Run(ctx, query.ID, owner.ID)
 	if err != nil {
 		t.Fatalf("run query: %v", err)
 	}
-	if len(rows) != 1 || rows[0]["name"] != "alpha" {
-		t.Fatalf("unexpected query rows: %#v", rows)
+	if len(runResult.Rows) != 1 || runResult.Rows[0]["name"] != "alpha" {
+		t.Fatalf("unexpected query rows: %#v", runResult)
+	}
+	if runResult.Benchmark.RowCount != 1 {
+		t.Fatalf("expected row count benchmark, got %#v", runResult.Benchmark)
 	}
 
 	updated, err := queryUC.Update(ctx, query.ID, owner.ID, UpdateQueryInput{
@@ -240,7 +243,7 @@ func TestQueryUsecaseRunStructuredRESTRequest(t *testing.T) {
 	dataSourceRepo := repository.NewDataSourceRepository(db)
 	queryRepo := repository.NewQueryRepository(db)
 	endpointRepo := repository.NewEndpointRepository(db)
-	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey, nil)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -267,15 +270,18 @@ func TestQueryUsecaseRunStructuredRESTRequest(t *testing.T) {
 	owner := testutil.MustCreateUser(t, db, testutil.UserSeed{Username: "owner-rest-structured"})
 	source := seedRESTSource(t, db, owner.ID, server.URL)
 
-	rows, err := queryUC.RunInput(ctx, owner.ID, RunQueryInput{
+	runResult, err := queryUC.RunInput(ctx, owner.ID, RunQueryInput{
 		DataSourceID: source.ID,
 		Body:         `{"method":"POST","path":"/alerts","queryParams":{"severity":"high"},"headers":{"X-Trace":"trace-1"},"body":{"orderCode":"ORD-1001"}}`,
 	})
 	if err != nil {
 		t.Fatalf("run structured REST query: %v", err)
 	}
-	if len(rows) != 1 || rows[0]["ok"] != true {
-		t.Fatalf("unexpected rows: %#v", rows)
+	if len(runResult.Rows) != 1 || runResult.Rows[0]["ok"] != true {
+		t.Fatalf("unexpected rows: %#v", runResult.Rows)
+	}
+	if runResult.Benchmark.RowCount != 1 {
+		t.Fatalf("unexpected benchmark: %#v", runResult.Benchmark)
 	}
 }
 
@@ -292,7 +298,7 @@ func TestEndpointCreateRejectsPaginationMismatchForSQLQuery(t *testing.T) {
 	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
 	pipelineRepo := repository.NewPipelineRepository(db)
 	telegramRepo := repository.NewTelegramIntegrationRepository(db)
-	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey, nil)
 	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
 	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 
@@ -332,7 +338,7 @@ func TestEndpointInvokeRejectsLegacyPaginationMismatchForSQLQuery(t *testing.T) 
 	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
 	pipelineRepo := repository.NewPipelineRepository(db)
 	telegramRepo := repository.NewTelegramIntegrationRepository(db)
-	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey, nil)
 	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
 	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 
@@ -388,7 +394,7 @@ func TestPipelineUsecaseCreateRunAndDelete(t *testing.T) {
 	pipelineRepo := repository.NewPipelineRepository(db)
 	telegramRepo := repository.NewTelegramIntegrationRepository(db)
 	systemSettingsRepo := repository.NewSystemSettingsRepository(db)
-	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey, nil)
 	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
 	endpointUC := NewEndpointUsecase(endpointRepo, endpointLogRepo, systemSettingsRepo, queryUC, pipelineUC)
 
@@ -472,7 +478,7 @@ func TestTelegramIntegrationWebhookRunsMatchingPipeline(t *testing.T) {
 	endpointRepo := repository.NewEndpointRepository(db)
 	pipelineRepo := repository.NewPipelineRepository(db)
 	telegramRepo := repository.NewTelegramIntegrationRepository(db)
-	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey, nil)
 	telegramUC := NewTelegramIntegrationUsecase(telegramRepo, testEncryptionKey)
 	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, telegramUC.SendPipelineMessage)
 	telegramUC.BindPipelineRunner(pipelineUC)
@@ -541,7 +547,7 @@ func TestPipelineUsecaseRunWithManualTelegramEvents(t *testing.T) {
 	endpointRepo := repository.NewEndpointRepository(db)
 	pipelineRepo := repository.NewPipelineRepository(db)
 	telegramRepo := repository.NewTelegramIntegrationRepository(db)
-	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey)
+	queryUC := NewQueryUsecase(queryRepo, dataSourceRepo, endpointRepo, testEncryptionKey, nil)
 	pipelineUC := NewPipelineUsecase(pipelineRepo, endpointRepo, dataSourceRepo, telegramRepo, queryUC, nil)
 
 	owner := testutil.MustCreateUser(t, db, testutil.UserSeed{Username: "owner-manual-telegram"})
@@ -775,6 +781,30 @@ func TestSystemSettingsUsecaseUIAppearanceMergeAndReset(t *testing.T) {
 	}
 	if reset.Override.Mode != nil || reset.Override.Palette != nil || reset.Override.Radius != nil || reset.Override.Density != nil || reset.Override.CustomAccent != nil {
 		t.Fatalf("expected overrides cleared after reset: %#v", reset.Override)
+	}
+}
+
+func TestBuildSchemaResultGroupsSchemasAndQualifiedTables(t *testing.T) {
+	t.Parallel()
+
+	result := buildSchemaResult([]schemaIntrospectionRow{
+		{SchemaName: "public", TableName: "users", ColumnName: "id", DataType: "uuid"},
+		{SchemaName: "public", TableName: "users", ColumnName: "email", DataType: "text"},
+		{SchemaName: "analytics", TableName: "events", ColumnName: "id", DataType: "bigint"},
+		{SchemaName: "analytics", TableName: "events", ColumnName: "created_at", DataType: "timestamptz"},
+	})
+
+	if len(result.Schemas) != 2 {
+		t.Fatalf("expected two schemas, got %#v", result)
+	}
+	if result.Schemas[0].Name != "public" || len(result.Schemas[0].Tables) != 1 {
+		t.Fatalf("unexpected public schema grouping: %#v", result.Schemas[0])
+	}
+	if result.Schemas[0].Tables[0].QualifiedName != "public.users" {
+		t.Fatalf("expected qualified table name, got %#v", result.Schemas[0].Tables[0])
+	}
+	if len(result.Schemas[1].Tables[0].Columns) != 2 {
+		t.Fatalf("expected grouped columns, got %#v", result.Schemas[1].Tables[0])
 	}
 }
 

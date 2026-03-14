@@ -1,45 +1,45 @@
 "use client"
 
-import Link from "next/link"
-import { ArrowRight, KeyRound, Palette } from "lucide-react"
+import { KeyRound, Palette } from "lucide-react"
+import { useState } from "react"
 
 import { InlineBanner, PageHeader, TypeTag } from "@/components/dashboard/platform-ui"
+import { APIKeysWorkspace } from "@/components/settings/api-keys-workspace"
+import { SidebarPreferencesCard } from "@/components/settings/sidebar-preferences-card"
+import { SystemSettingsWorkspace } from "@/components/settings/system-settings-workspace"
+import { UICustomizePanel } from "@/components/settings/ui-customize-panel"
 import { cn } from "@/lib/utils"
 
-type SettingsOption = {
-  href: string
-  label: string
-  title: string
-  description: string
-  meta: string
-  icon: typeof Palette
-}
+type SettingsTab = "appearance" | "runtime"
 
 export function AdminSettingsWorkspace({
+  initialPlatformName,
   isAdmin,
 }: {
+  initialPlatformName: string
   isAdmin: boolean
 }) {
-  const options: SettingsOption[] = [
+  const [activeTab, setActiveTab] = useState<SettingsTab>("appearance")
+  const [platformName, setPlatformName] = useState(initialPlatformName)
+  const tabs: Array<{
+    description: string
+    icon: typeof Palette
+    key: SettingsTab
+    label: string
+  }> = [
     {
-      href: "/dashboard/settings/appearance",
+      key: "appearance",
       label: "Appearance",
-      title: "UI theme customize",
-      description:
-        "Adjust the shared workspace look, preview tokens live, and tune the sidebar behavior without leaving the operator shell.",
-      meta: isAdmin ? "Theme, palette, density, sidebar, platform defaults" : "Theme preview and sidebar behavior",
+      description: "Theme, sidebar behavior, and workspace defaults",
       icon: Palette,
     },
   ]
 
   if (isAdmin) {
-    options.push({
-      href: "/dashboard/settings/api-keys",
+    tabs.push({
+      key: "runtime",
       label: "Runtime",
-      title: "API keys",
-      description:
-        "Create scoped runtime keys, rotate access cleanly, and manage which credentials can invoke published endpoints.",
-      meta: "Scoped endpoint access",
+      description: "API key access and invocation credentials",
       icon: KeyRound,
     })
   }
@@ -47,55 +47,67 @@ export function AdminSettingsWorkspace({
   return (
     <div className="space-y-5">
       <PageHeader
-        description="Open a focused settings surface instead of scrolling through one long admin stack."
+        description="Switch between settings surfaces with tabs instead of jumping through launcher cards."
         label="Preferences"
         title="Settings"
       />
 
       {isAdmin ? (
         <InlineBanner tone="info">
-          User management moved to its own sidebar destination so Settings stays
-          focused on appearance and runtime access.
+          User management stays in its own sidebar destination. Settings is now focused on appearance and runtime access.
         </InlineBanner>
       ) : null}
 
-      <section className="grid gap-5 xl:grid-cols-2">
-        {options.map((option) => {
-          const Icon = option.icon
+      <section className="panel overflow-hidden">
+        <div className="panel-header">
+          <div>
+            <p className="page-label">Settings tabs</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+              Workspace controls
+            </h2>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 border-b border-border px-4 py-4">
+          {tabs.map((tab) => {
+            const Icon = tab.icon
 
-          return (
-            <Link
-              className={cn(
-                "panel overflow-hidden transition-[border-color,transform,background-color,box-shadow] duration-200",
-                "hover:border-[color:color-mix(in_oklab,var(--accent)_26%,var(--border))] hover:bg-surface-raised hover:shadow-[0_18px_44px_-34px_rgba(15,23,42,0.35)]"
-              )}
-              href={option.href}
-              key={option.href}
-            >
-              <div className="panel-header">
-                <div className="flex items-center gap-3">
-                  <span className="bg-surface flex size-10 items-center justify-center rounded-[14px] border border-border text-[color:var(--accent-strong)]">
-                    <Icon className="size-4" />
-                  </span>
-                  <div>
-                    <p className="page-label">{option.label}</p>
-                    <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-                      {option.title}
-                    </h2>
-                  </div>
-                </div>
-                <ArrowRight className="size-4 text-secondary" />
-              </div>
-              <div className="panel-body space-y-4">
-                <p className="max-w-xl text-sm leading-6 text-secondary">
-                  {option.description}
-                </p>
-                <TypeTag>{option.meta}</TypeTag>
-              </div>
-            </Link>
-          )
-        })}
+            return (
+              <button
+                key={tab.key}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors",
+                  activeTab === tab.key
+                    ? "bg-accent-soft text-foreground"
+                    : "text-secondary hover:bg-surface-raised hover:text-foreground"
+                )}
+                onClick={() => setActiveTab(tab.key)}
+                type="button"
+              >
+                <Icon className="size-4" />
+                <span>{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm text-secondary">
+          <p>
+            {tabs.find((tab) => tab.key === activeTab)?.description}
+          </p>
+          <TypeTag>{activeTab}</TypeTag>
+        </div>
       </section>
+
+      {activeTab === "appearance" ? (
+        <div className="space-y-5">
+          <UICustomizePanel platformName={platformName} />
+          <SidebarPreferencesCard />
+          {isAdmin ? (
+            <SystemSettingsWorkspace onPlatformNameChange={setPlatformName} />
+          ) : null}
+        </div>
+      ) : null}
+
+      {activeTab === "runtime" && isAdmin ? <APIKeysWorkspace /> : null}
     </div>
   )
 }

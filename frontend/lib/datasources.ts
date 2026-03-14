@@ -50,14 +50,50 @@ export type DataSource = {
 }
 
 export type SchemaColumn = {
-  table: string
   name: string
   dataType: string
 }
 
-export type SchemaResult = {
-  tables: string[]
+export type SchemaTable = {
+  name: string
+  qualifiedName: string
   columns: SchemaColumn[]
+}
+
+export type SchemaNamespace = {
+  name: string
+  tables: SchemaTable[]
+}
+
+export type SchemaResult = {
+  schemas: SchemaNamespace[]
+}
+
+export function countSchemaTables(schema?: SchemaResult | null) {
+  return schema?.schemas.reduce((total, namespace) => total + namespace.tables.length, 0) ?? 0
+}
+
+export function countSchemaColumns(schema?: SchemaResult | null) {
+  return (
+    schema?.schemas.reduce(
+      (total, namespace) =>
+        total + namespace.tables.reduce((tableTotal, table) => tableTotal + table.columns.length, 0),
+      0
+    ) ?? 0
+  )
+}
+
+export function flattenSchemaTables(schema?: SchemaResult | null) {
+  if (!schema) {
+    return []
+  }
+
+  return schema.schemas.flatMap((namespace) =>
+    namespace.tables.map((table) => ({
+      schema: namespace.name,
+      ...table,
+    }))
+  )
 }
 
 export const sourceTypeOptions = [

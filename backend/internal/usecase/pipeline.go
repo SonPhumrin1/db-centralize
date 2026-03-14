@@ -66,16 +66,26 @@ func NewPipelineUsecase(
 		executor: &executor.PipelineExecutor{
 			ResolveSource: dataSourceRepo.FindByID,
 			RunDB: func(ctx context.Context, source model.DataSource, queryBody string, options executor.QueryExecutionOptions) ([]map[string]any, error) {
-				return queryUsecase.RunAgainstSource(ctx, source, queryBody, QueryRunOptions{
+				result, err := queryUsecase.RunAgainstSource(ctx, source, queryBody, QueryRunOptions{
 					Params:   options.Params,
 					RowLimit: options.RowLimit,
 				})
+				if err != nil {
+					return nil, err
+				}
+
+				return result.Rows, nil
 			},
 			RunREST: func(ctx context.Context, source model.DataSource, request restrequest.Request, options executor.QueryExecutionOptions) ([]map[string]any, error) {
-				return queryUsecase.FetchREST(ctx, source, request, QueryRunOptions{
+				result, err := queryUsecase.FetchREST(ctx, source, request, QueryRunOptions{
 					Params:   options.Params,
 					RowLimit: options.RowLimit,
 				})
+				if err != nil {
+					return nil, err
+				}
+
+				return result.Rows, nil
 			},
 			ResolveTelegramIntegration: telegramRepo.FindByID,
 			SendTelegram:               sendTelegram,

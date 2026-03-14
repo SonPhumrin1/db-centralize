@@ -15,8 +15,6 @@ import (
 	"dataplatform/backend/internal/model"
 	"dataplatform/backend/internal/repository"
 	"github.com/redis/go-redis/v9"
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -68,14 +66,30 @@ type DataSourceView struct {
 }
 
 type SchemaColumn struct {
-	Table    string `json:"table"`
 	Name     string `json:"name"`
 	DataType string `json:"dataType"`
 }
 
+type SchemaTable struct {
+	Name          string         `json:"name"`
+	QualifiedName string         `json:"qualifiedName"`
+	Columns       []SchemaColumn `json:"columns"`
+}
+
+type SchemaNamespace struct {
+	Name   string        `json:"name"`
+	Tables []SchemaTable `json:"tables"`
+}
+
 type SchemaResult struct {
-	Tables  []string       `json:"tables"`
-	Columns []SchemaColumn `json:"columns"`
+	Schemas []SchemaNamespace `json:"schemas"`
+}
+
+type schemaIntrospectionRow struct {
+	SchemaName string
+	TableName  string
+	ColumnName string
+	DataType   string
 }
 
 type DataSourceUsecase struct {
@@ -83,13 +97,24 @@ type DataSourceUsecase struct {
 	encryptionKey []byte
 	redisClient   *redis.Client
 	httpClient    *http.Client
+	poolManager   *ExternalDataSourcePoolManager
 }
 
-func NewDataSourceUsecase(repo repository.DataSourceRepository, encryptionKey []byte, redisClient *redis.Client) *DataSourceUsecase {
+func NewDataSourceUsecase(
+	repo repository.DataSourceRepository,
+	encryptionKey []byte,
+	redisClient *redis.Client,
+	poolManager *ExternalDataSourcePoolManager,
+) *DataSourceUsecase {
+	if poolManager == nil {
+		poolManager = NewExternalDataSourcePoolManager()
+	}
+
 	return &DataSourceUsecase{
 		repo:          repo,
 		encryptionKey: encryptionKey,
 		redisClient:   redisClient,
+		poolManager:   poolManager,
 		httpClient: &http.Client{
 			Timeout: 5 * time.Second,
 		},
@@ -204,7 +229,7 @@ func (u *DataSourceUsecase) Test(ctx context.Context, id, userID uint) error {
 	}
 
 	testedAt := time.Now().UTC()
-	if err := u.testConfig(ctx, source.Type, config); err != nil {
+	if err := u.testStoredSource(ctx, *source, config); err != nil {
 		_ = u.repo.UpdateStatus(ctx, id, userID, model.DataSourceStatusError, testedAt)
 		return err
 	}
@@ -221,17 +246,16 @@ func (u *DataSourceUsecase) Schema(ctx context.Context, id, userID uint) (*Schem
 		return nil, ErrSchemaUnavailable
 	}
 
-	cacheKey := fmt.Sprintf("datasource-schema:%d:%d", userID, source.ID)
-	if cached, ok := u.getCachedSchema(ctx, cacheKey); ok {
-		return cached, nil
-	}
-
 	config, err := u.decryptConfig(source.ConfigEncrypted)
 	if err != nil {
 		return nil, err
 	}
 
-	schema, err := u.loadSchema(ctx, source.Type, config)
+	cacheKey := schemaCacheKey(userID, *source, config)
+	if cached, ok := u.getCachedSchema(ctx, cacheKey); ok {
+		return cached, nil
+	}
+	schema, err := u.loadSchema(ctx, *source, config)
 	if err != nil {
 		return nil, err
 	}
@@ -281,17 +305,14 @@ func (u *DataSourceUsecase) decryptConfig(payload string) (DataSourceConfig, err
 func (u *DataSourceUsecase) testConfig(ctx context.Context, sourceType string, config DataSourceConfig) error {
 	switch sourceType {
 	case model.DataSourceTypePostgres, model.DataSourceTypeMySQL:
-		db, closeFn, err := openDatabaseConnection(sourceType, config)
+		db, err := u.databaseForIdentity(ctx, ExternalDataSourceIdentity{
+			SourceType: sourceType,
+			Config:     config,
+		})
 		if err != nil {
-			return err
+			return fmt.Errorf("ping data source: %w", err)
 		}
-		defer closeFn()
-
-		sqlDB, err := db.DB()
-		if err != nil {
-			return fmt.Errorf("db handle: %w", err)
-		}
-		if err := sqlDB.PingContext(ctx); err != nil {
+		if err := pingDatabase(ctx, db); err != nil {
 			return fmt.Errorf("ping data source: %w", err)
 		}
 
@@ -331,34 +352,48 @@ func (u *DataSourceUsecase) testConfig(ctx context.Context, sourceType string, c
 	}
 }
 
-func (u *DataSourceUsecase) loadSchema(ctx context.Context, sourceType string, config DataSourceConfig) (*SchemaResult, error) {
-	db, closeFn, err := openDatabaseConnection(sourceType, config)
+func (u *DataSourceUsecase) testStoredSource(ctx context.Context, source model.DataSource, config DataSourceConfig) error {
+	switch source.Type {
+	case model.DataSourceTypePostgres, model.DataSourceTypeMySQL:
+		db, err := u.databaseForSource(ctx, source, config)
+		if err != nil {
+			return fmt.Errorf("ping data source: %w", err)
+		}
+		if err := pingDatabase(ctx, db); err != nil {
+			return fmt.Errorf("ping data source: %w", err)
+		}
+
+		return nil
+	case model.DataSourceTypeREST:
+		return u.testConfig(ctx, source.Type, config)
+	default:
+		return ErrUnsupportedDataSourceType
+	}
+}
+
+func (u *DataSourceUsecase) loadSchema(ctx context.Context, source model.DataSource, config DataSourceConfig) (*SchemaResult, error) {
+	db, err := u.databaseForSource(ctx, source, config)
 	if err != nil {
 		return nil, err
 	}
-	defer closeFn()
 
-	type schemaRow struct {
-		TableName  string
-		ColumnName string
-		DataType   string
-	}
-
-	var rows []schemaRow
-	switch sourceType {
+	var rows []schemaIntrospectionRow
+	switch source.Type {
 	case model.DataSourceTypePostgres:
 		err = db.WithContext(ctx).Raw(`
-			SELECT table_name, column_name, data_type
+			SELECT table_schema, table_name, column_name, data_type
 			FROM information_schema.columns
-			WHERE table_schema = 'public'
-			ORDER BY table_name, ordinal_position
+			WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+			  AND table_schema NOT LIKE 'pg_temp_%'
+			  AND table_schema NOT LIKE 'pg_toast_temp_%'
+			ORDER BY table_schema, table_name, ordinal_position
 		`).Scan(&rows).Error
 	case model.DataSourceTypeMySQL:
 		err = db.WithContext(ctx).Raw(`
-			SELECT table_name, column_name, data_type
+			SELECT table_schema, table_name, column_name, data_type
 			FROM information_schema.columns
 			WHERE table_schema = DATABASE()
-			ORDER BY table_name, ordinal_position
+			ORDER BY table_schema, table_name, ordinal_position
 		`).Scan(&rows).Error
 	default:
 		return nil, ErrSchemaUnavailable
@@ -367,24 +402,45 @@ func (u *DataSourceUsecase) loadSchema(ctx context.Context, sourceType string, c
 		return nil, fmt.Errorf("load schema: %w", err)
 	}
 
+	return buildSchemaResult(rows), nil
+}
+
+func buildSchemaResult(rows []schemaIntrospectionRow) *SchemaResult {
 	result := &SchemaResult{
-		Tables:  make([]string, 0),
-		Columns: make([]SchemaColumn, 0, len(rows)),
+		Schemas: make([]SchemaNamespace, 0),
 	}
-	seenTables := make(map[string]struct{}, len(rows))
+	schemaIndexes := make(map[string]int)
+	tableIndexes := make(map[string]int)
 	for _, row := range rows {
-		if _, seen := seenTables[row.TableName]; !seen {
-			seenTables[row.TableName] = struct{}{}
-			result.Tables = append(result.Tables, row.TableName)
+		schemaIndex, ok := schemaIndexes[row.SchemaName]
+		if !ok {
+			schemaIndex = len(result.Schemas)
+			schemaIndexes[row.SchemaName] = schemaIndex
+			result.Schemas = append(result.Schemas, SchemaNamespace{
+				Name:   row.SchemaName,
+				Tables: make([]SchemaTable, 0),
+			})
 		}
-		result.Columns = append(result.Columns, SchemaColumn{
-			Table:    row.TableName,
+		schema := &result.Schemas[schemaIndex]
+		tableKey := row.SchemaName + "." + row.TableName
+		tableIndex, ok := tableIndexes[tableKey]
+		if !ok {
+			tableIndex = len(schema.Tables)
+			tableIndexes[tableKey] = tableIndex
+			schema.Tables = append(schema.Tables, SchemaTable{
+				Name:          row.TableName,
+				QualifiedName: tableKey,
+				Columns:       make([]SchemaColumn, 0),
+			})
+		}
+		table := &schema.Tables[tableIndex]
+		table.Columns = append(table.Columns, SchemaColumn{
 			Name:     row.ColumnName,
 			DataType: row.DataType,
 		})
 	}
 
-	return result, nil
+	return result
 }
 
 func (u *DataSourceUsecase) getCachedSchema(ctx context.Context, key string) (*SchemaResult, bool) {
@@ -416,6 +472,48 @@ func (u *DataSourceUsecase) cacheSchema(ctx context.Context, key string, schema 
 	}
 
 	_ = u.redisClient.Set(ctx, key, payload, 5*time.Minute).Err()
+}
+
+func (u *DataSourceUsecase) databaseForIdentity(ctx context.Context, identity ExternalDataSourceIdentity) (*gorm.DB, error) {
+	db, err := u.poolManager.Acquire(ctx, identity)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func (u *DataSourceUsecase) databaseForSource(ctx context.Context, source model.DataSource, config DataSourceConfig) (*gorm.DB, error) {
+	return u.databaseForIdentity(ctx, ExternalDataSourceIdentity{
+		UserID:     source.UserID,
+		SourceID:   source.ID,
+		SourceType: source.Type,
+		Config:     config,
+	})
+}
+
+func schemaCacheKey(userID uint, source model.DataSource, config DataSourceConfig) string {
+	identity := ExternalDataSourceIdentity{
+		UserID:     userID,
+		SourceID:   source.ID,
+		SourceType: source.Type,
+		Config:     config,
+	}
+	key, err := buildExternalDataSourcePoolKey(identity)
+	if err != nil {
+		return fmt.Sprintf("datasource-schema:v2:%d:%d", userID, source.ID)
+	}
+
+	return "datasource-schema:v2:" + key
+}
+
+func pingDatabase(ctx context.Context, db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("db handle: %w", err)
+	}
+
+	return sqlDB.PingContext(ctx)
 }
 
 func normalizeSourceType(raw string) (string, error) {
@@ -480,32 +578,6 @@ func validateConfig(sourceType string, config DataSourceConfig) error {
 	default:
 		return ErrUnsupportedDataSourceType
 	}
-}
-
-func openDatabaseConnection(sourceType string, config DataSourceConfig) (*gorm.DB, func() error, error) {
-	var (
-		db  *gorm.DB
-		err error
-	)
-
-	switch sourceType {
-	case model.DataSourceTypePostgres:
-		db, err = gorm.Open(postgres.Open(buildPostgresDSN(config)), &gorm.Config{})
-	case model.DataSourceTypeMySQL:
-		db, err = gorm.Open(mysql.Open(buildMySQLDSN(config)), &gorm.Config{})
-	default:
-		return nil, nil, ErrUnsupportedDataSourceType
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("open external database: %w", err)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, nil, fmt.Errorf("sql db handle: %w", err)
-	}
-
-	return db, sqlDB.Close, nil
 }
 
 func buildPostgresDSN(config DataSourceConfig) string {

@@ -1,6 +1,6 @@
 import type { Completion } from "@codemirror/autocomplete"
 
-import type { SchemaResult } from "@/lib/datasources"
+import { flattenSchemaTables, type SchemaResult } from "@/lib/datasources"
 
 export type SavedQuery = {
   id: number
@@ -24,22 +24,37 @@ export type RunQueryInput = {
 
 export type QueryResultRow = Record<string, unknown>
 
+export type QueryRunResponse = {
+  rows: QueryResultRow[]
+  benchmark: {
+    backendMs: number
+    rowCount: number
+  }
+}
+
 export function buildSqlAutocompleteSchema(schema?: SchemaResult) {
   if (!schema) {
     return {}
   }
 
   const tables: Record<string, Completion[]> = {}
-  for (const column of schema.columns) {
-    const existing = tables[column.table] ?? []
-    tables[column.table] = [
-      ...existing,
-      {
-        label: column.name,
-        type: "property",
-        detail: column.dataType,
-      },
-    ]
+  const flattened = flattenSchemaTables(schema)
+  const simpleNameCounts = new Map<string, number>()
+  for (const table of flattened) {
+    simpleNameCounts.set(table.name.toLowerCase(), (simpleNameCounts.get(table.name.toLowerCase()) ?? 0) + 1)
+  }
+
+  for (const table of flattened) {
+    const completions = table.columns.map((column) => ({
+      label: column.name,
+      type: "property" as const,
+      detail: column.dataType,
+    }))
+
+    tables[table.qualifiedName] = completions
+    if ((simpleNameCounts.get(table.name.toLowerCase()) ?? 0) === 1) {
+      tables[table.name] = completions
+    }
   }
 
   return tables
@@ -53,15 +68,24 @@ export function inferDefaultSqlTable(
     return undefined
   }
 
-  const knownTables = new Set(schema.tables.map((table) => table.toLowerCase()))
+  const flattened = flattenSchemaTables(schema)
+  const qualified = new Set(flattened.map((table) => table.qualifiedName.toLowerCase()))
+  const simpleNameCounts = new Map<string, number>()
+  for (const table of flattened) {
+    simpleNameCounts.set(table.name.toLowerCase(), (simpleNameCounts.get(table.name.toLowerCase()) ?? 0) + 1)
+  }
+
   const matches = Array.from(
-    query.matchAll(/\b(?:from|join)\s+([a-zA-Z_][\w$]*)/gi),
+    query.matchAll(/\b(?:from|join)\s+([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)/gi),
     (match) => match[1]
   )
 
   const tables = matches.filter((table, index, all) => {
     const normalized = table.toLowerCase()
-    return knownTables.has(normalized) && all.findIndex((item) => item.toLowerCase() === normalized) === index
+    const isQualified = qualified.has(normalized)
+    const isUniqueSimple = (simpleNameCounts.get(normalized) ?? 0) === 1
+
+    return (isQualified || isUniqueSimple) && all.findIndex((item) => item.toLowerCase() === normalized) === index
   })
 
   if (tables.length !== 1) {
@@ -69,5 +93,13 @@ export function inferDefaultSqlTable(
   }
 
   const normalized = tables[0].toLowerCase()
-  return schema.tables.find((table) => table.toLowerCase() === normalized)
+  const exactQualified = flattened.find((table) => table.qualifiedName.toLowerCase() === normalized)
+  if (exactQualified) {
+    return exactQualified.qualifiedName
+  }
+
+  const exactSimple = flattened.find(
+    (table) => table.name.toLowerCase() === normalized && (simpleNameCounts.get(normalized) ?? 0) === 1
+  )
+  return exactSimple?.name
 }

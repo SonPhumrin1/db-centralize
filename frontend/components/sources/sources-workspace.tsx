@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  flattenSchemaTables,
   type CreateDataSourceInput,
   type DataSource,
   type DataSourceConfig,
@@ -617,12 +618,12 @@ export function SourcesWorkspace() {
                                     </span>
                                   ) : schema ? (
                                     <div className="flex flex-wrap gap-1.5">
-                                      {schema.tables
+                                      {flattenSchemaTables(schema)
                                         .slice(0, 8)
                                         .map((table) => (
-                                          <TypeTag key={table}>{table}</TypeTag>
+                                          <TypeTag key={table.qualifiedName}>{table.qualifiedName}</TypeTag>
                                         ))}
-                                      {schema.tables.length === 0 ? (
+                                      {flattenSchemaTables(schema).length === 0 ? (
                                         <span className="text-sm text-secondary">
                                           No tables cached.
                                         </span>

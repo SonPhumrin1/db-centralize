@@ -4,7 +4,12 @@ import { notFound, redirect } from "next/navigation"
 
 import { StatusBadge, TypeTag } from "@/components/dashboard/platform-ui"
 import { Button } from "@/components/ui/button"
-import type { DataSource, SchemaResult } from "@/lib/datasources"
+import {
+  countSchemaColumns,
+  countSchemaTables,
+  type DataSource,
+  type SchemaResult,
+} from "@/lib/datasources"
 import { backendFetch } from "@/lib/platform-server"
 import { getServerSession } from "@/lib/server-session"
 
@@ -121,7 +126,7 @@ export default async function SourceDetailPage({ params }: SourcePageProps) {
           <p className="mt-3 font-mono text-sm text-foreground">
             {source.type === "rest"
               ? "N/A"
-              : `${schema?.tables.length ?? 0} tables / ${schema?.columns.length ?? 0} cols`}
+              : `${countSchemaTables(schema)} tables / ${countSchemaColumns(schema)} cols`}
           </p>
         </div>
       </section>
@@ -159,37 +164,51 @@ export default async function SourceDetailPage({ params }: SourcePageProps) {
               </div>
             </div>
             <p className="mono-value text-secondary">
-              {schema?.tables.length ?? 0} tables / {schema?.columns.length ?? 0} columns
+              {countSchemaTables(schema)} tables / {countSchemaColumns(schema)} columns
             </p>
           </div>
 
-          <div className="border-b border-border px-4 py-3">
-            <div className="flex flex-wrap gap-2">
-              {schema?.tables.map((table) => (
-                <TypeTag key={table}>{table}</TypeTag>
-              ))}
-            </div>
-          </div>
+          <div className="space-y-4 px-4 py-4">
+            {schema?.schemas.map((namespace) => (
+              <section key={namespace.name} className="rounded-[10px] border border-border px-4 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{namespace.name}</p>
+                    <p className="mt-1 text-sm text-secondary">
+                      {namespace.tables.length} tables /{" "}
+                      {namespace.tables.reduce((total, table) => total + table.columns.length, 0)} columns
+                    </p>
+                  </div>
+                  <TypeTag>{namespace.name}</TypeTag>
+                </div>
 
-          <div className="overflow-auto">
-            <table className="data-table min-w-full">
-              <thead>
-                <tr>
-                  <th>Table</th>
-                  <th>Column</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schema?.columns.map((column) => (
-                  <tr key={`${column.table}:${column.name}`} className="data-row">
-                    <td className="font-medium">{column.table}</td>
-                    <td className="font-mono text-[13px]">{column.name}</td>
-                    <td className="font-mono text-[13px] text-secondary">{column.dataType}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                <div className="mt-4 space-y-4">
+                  {namespace.tables.map((table) => (
+                    <div key={table.qualifiedName} className="rounded-[8px] border border-border px-3 py-3">
+                      <p className="font-medium">{table.qualifiedName}</p>
+                      <div className="mt-3 overflow-auto">
+                        <table className="data-table min-w-full">
+                          <thead>
+                            <tr>
+                              <th>Field</th>
+                              <th>Type</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {table.columns.map((column) => (
+                              <tr key={`${table.qualifiedName}:${column.name}`} className="data-row">
+                                <td className="font-mono text-[13px]">{column.name}</td>
+                                <td className="font-mono text-[13px] text-secondary">{column.dataType}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         </section>
       )}
